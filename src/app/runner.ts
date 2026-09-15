@@ -103,7 +103,8 @@ export class Runner {
         flex.GameName = 'FlexDMD Studio';
         flex.Run = true;
         const interp = new Interpreter({
-          globals: { FlexDMD: flex },
+          // Table1 is a stub so table-style init code (Table1.Filename & ".vpx") runs in the preview
+          globals: { FlexDMD: flex, Table1: { Filename: 'Table1', Name: 'Table1' } },
           createObject: (progId) => {
             if (progId.toLowerCase() === 'flexdmd.flexdmd') return flex;
             throw new VbsRuntimeError(`CreateObject("${progId}") is not available in the previewer`, null, 429);

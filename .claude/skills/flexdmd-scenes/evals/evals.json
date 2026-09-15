@@ -1,0 +1,48 @@
+{
+  "skill_name": "flexdmd-scenes",
+  "evals": [
+    {
+      "id": 1,
+      "prompt": "I'm building an original VPX table called Neon Alley. Write the FlexDMD code for its DMD (128x32, full color): a score screen showing the current player's score big in the middle with 'PLAYER n' bottom-left and 'BALL n' bottom-right, plus a Sub I can call when a jackpot is hit that flashes 'JACKPOT' with the value for about 2 seconds and then goes back to the score. Give me the init code too, and make it safe when FlexDMD isn't installed.",
+      "expected_output": "A VBScript file with DMD_Init (CreateObject, GameName, RenderMode 2, Width/Height, Clear, Run), fonts created once, a score Group with three labels in fixed boxes, an UpdateScore Sub wrapped in Lock/UnlockRenderThread, and a Jackpot Sub that builds an overlay group with a Blink and a Wait+RemoveFromParent sequence added to the stage; Nothing guards; Table1_Exit sets Run = False.",
+      "files": [],
+      "assertions": [
+        "Script runs in FlexDMD Studio without errors",
+        "Guards against FlexDMD not being installed (Is Nothing check)",
+        "Wraps stage changes in LockRenderThread/UnlockRenderThread",
+        "Stops FlexDMD in Table1_Exit (Run = False)",
+        "Jackpot Sub runs without error when called with a numeric value",
+        "Jackpot overlay is on stage at 0.5 s and gone by 3.5 s after the call",
+        "Score scene has at least three labels (score, player, ball)"
+      ]
+    },
+    {
+      "id": 2,
+      "prompt": "my flexdmd attract mode is broken. the logo shows but it never switches to the high score scene. here's the code:\n\nSet attract = FlexDMD.NewGroup(\"Attract\")\nSet seq = attract.ActionFactory.Sequence()\nseq.Add attract.ActionFactory.AddChild(logoScene)\nseq.Add attract.ActionFactory.Wait(4)\nseq.Add attract.ActionFactory.RemoveChild(logoScene)\nseq.Add attract.ActionFactory.AddChild(hsScene)\nseq.Add attract.ActionFactory.Wait(4)\nseq.Add attract.ActionFactory.RemoveChild(hsScene)\nattract.AddAction attract.ActionFactory.Repeat(seq, -1)\nFlexDMD.Stage.AddActor logoScene\n\nwhat's wrong?",
+      "expected_output": "Identifies that the attract group is never added to the stage so its actions never run (only logoScene was added directly), and that logoScene added directly to the stage stays forever; the fix adds `attract` to the stage instead (SetSize, opaque backgrounds or Clear = True so scenes replace each other), with corrected code.",
+      "files": [],
+      "assertions": [
+        "Diagnosis says the attract group is never added to the stage",
+        "fixed.vbs runs in FlexDMD Studio without errors",
+        "Fixed code adds the attract group to the stage",
+        "Scenes switch: the set of visible groups differs between t=1 s and t=5 s"
+      ]
+    },
+    {
+      "id": 3,
+      "prompt": "For my pinball table DMD I want a 'MULTIBALL' banner that slides in from the left with a bounce, holds for a second and a half, then slides out to the right, using the FlexDMD API. 128x32, monochrome orange. Also a row of small dots along the bottom that blink while multiball is active. Write it as a Sub StartMultiball and a Sub EndMultiball.",
+      "expected_output": "VBScript with RenderMode 0/1 and Color orange, a scene group added to the stage, a label starting off-screen with a Sequence of MoveTo (Ease 20 BounceOut), Wait(1.5), MoveTo off right; Frame actors with Blink(-1) in a loop; EndMultiball removes the scene; lock/unlock around stage changes.",
+      "files": [],
+      "assertions": [
+        "Script runs in FlexDMD Studio without errors",
+        "StartMultiball runs without error",
+        "Banner label starts off screen and is fully inside the 128 dot width during the hold (t=1.0 s)",
+        "Banner has left the display or been removed by t=2.7 s",
+        "Uses a bounce easing (Ease 19, 20 or 21)",
+        "Bottom dots are Frame actors with Blink actions",
+        "Monochrome render mode (0 or 1) with an orange Color",
+        "EndMultiball removes the dots from the stage"
+      ]
+    }
+  ]
+}
