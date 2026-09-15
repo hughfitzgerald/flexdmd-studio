@@ -18,7 +18,9 @@ interface in `FlexDMD/IFlexDMD.cs`); when in doubt about a behaviour, read it ra
   sequence). Groups nest and translate their children. Draw order is child order; there is no z-index.
 - **Actions animate actors.** Every actor has an `ActionFactory` that builds actions: `Wait`, `Delayed`, `Show`,
   `Blink`, `MoveTo` (tween with `Ease`), `AddTo`, `RemoveFromParent`, `AddChild`, `RemoveChild`, `Seek`, and the
-  composites `Sequence`, `Parallel`, `Repeat`. `actor.AddAction action` starts it. Actions run one frame at a time
+  composites `Sequence`, `Parallel`, `Repeat`. All of them reset themselves when they finish, so they can run
+  again inside a `Repeat` — except a counted `Blink`, which must not be used in anything that repeats (see
+  pitfalls #11 for the Wait/Show replacement). `actor.AddAction action` starts it. Actions run one frame at a time
   at 60 fps, but **only while the actor is on stage** (reachable from `Stage`). An action added to a detached
   group never starts.
 - **The frame persists.** The stage is drawn over the previous frame; nothing is cleared unless
@@ -114,7 +116,14 @@ Sub Jackpot(value)
     Set lbl = FlexDMD.NewLabel("Text", fontBig, "JACKPOT" & vbCrLf & FormatNumber(value, 0))
     lbl.SetBounds 0, 0, 128, 32          ' full-size box, text centered inside (Alignment defaults to 4)
     scene.AddActor lbl
-    lbl.AddAction lbl.ActionFactory.Blink(0.15, 0.1, 6)
+    Dim lf, blink
+    Set lf = lbl.ActionFactory              ' flash the text: Wait/Show in a Repeat, never a counted af.Blink
+    Set blink = lf.Sequence()
+    blink.Add lf.Wait(0.15)
+    blink.Add lf.Show(False)
+    blink.Add lf.Wait(0.1)
+    blink.Add lf.Show(True)
+    lbl.AddAction lf.Repeat(blink, 4)
     Set af = scene.ActionFactory
     Set seq = af.Sequence()
     seq.Add af.Wait(3)

@@ -66,6 +66,63 @@ describe('actions', () => {
     expect(a.actions.length).toBe(0);
   });
 
+  it('reproduces FlexDMD\'s counted-Blink quirk: ends hidden and does not reset for a second run', () => {
+    // FlexDMD's BlinkAction is the one action that does not "prepare for restart": it keeps its cycle
+    // counter and leaves the actor hidden when it completes (identical in the C# and C++ engines).
+    // The port is faithful on purpose, so scripts that look right in the studio look right in VPX.
+    const s = stage();
+    const a = new Actor('b');
+    s.AddActor(a);
+    const af = a.ActionFactory;
+    const seq = af.Sequence();
+    seq.Add(af.Blink(0.1, 0.1, 1));
+    seq.Add(af.Wait(0.2));
+    a.AddAction(af.Repeat(seq, -1));
+    const run = (seconds: number) => { for (let i = 0; i < Math.round(seconds * 60); i++) s.Update(1 / 60); };
+    run(0.45);
+    expect(a.Visible).toBe(false);          // the blink completed on a hide
+    const before = a.Visible;
+    run(0.35);                               // second pass through the sequence
+    expect(before).toBe(false);
+    // On the second pass the retained counter ends the blink after a single toggle, so the actor
+    // spends almost all of its time hidden: this is the "barely there on later loops" symptom.
+    let visibleFrames = 0;
+    for (let i = 0; i < 180; i++) { s.Update(1 / 60); if (a.Visible) visibleFrames++; }
+    expect(visibleFrames / 180).toBeLessThan(0.5);
+  });
+
+  it('blinks correctly inside a Repeat when built from Wait/Show', () => {
+    const s = stage();
+    const a = new Actor('b');
+    s.AddActor(a);
+    const af = a.ActionFactory;
+    const blink = af.Sequence();
+    blink.Add(af.Wait(0.2));
+    blink.Add(af.Show(false));
+    blink.Add(af.Wait(0.15));
+    blink.Add(af.Show(true));
+    const seq = af.Sequence();
+    seq.Add(af.Repeat(blink, 3));
+    seq.Add(af.Wait(1));
+    a.AddAction(af.Repeat(seq, -1));
+    const cycle = () => {
+      let visible = 0, hidden = 0, edges = 0, last = a.Visible;
+      for (let i = 0; i < Math.round(2.05 * 60); i++) {
+        s.Update(1 / 60);
+        if (a.Visible) visible++; else hidden++;
+        if (a.Visible !== last) { edges++; last = a.Visible; }
+      }
+      return { visible, hidden, edges };
+    };
+    const first = cycle();
+    const second = cycle();
+    // Three flashes per pass, and the second pass behaves like the first
+    expect(first.edges).toBe(6);
+    expect(second.edges).toBe(6);
+    expect(Math.abs(first.visible - second.visible)).toBeLessThanOrEqual(2);
+    expect(a.Visible).toBe(true);           // ends visible, unlike a counted Blink
+  });
+
   it('AddChild / RemoveChild and RemoveFromParent manipulate the tree', () => {
     const s = stage();
     const scene = new Group(flexStub, 'scene');

@@ -106,14 +106,24 @@ the group and remove the previous one first: `If FlexDMD.Stage.HasChild("Message
 
 ## Flash / blink emphasis
 
+Build a counted blink out of `Wait`/`Show` inside a `Repeat`. `ActionFactory.Blink` with a count leaves the actor
+hidden when it ends and never resets its counter, so it misbehaves on the second pass of any loop (pitfalls #11):
+
 ```vbscript
-lbl.AddAction lbl.ActionFactory.Blink(0.12, 0.08, 5)   ' 6 flashes, ends hidden
-' keep it visible afterwards:
 Set af = lbl.ActionFactory
-Set seq = af.Sequence()
-seq.Add af.Blink(0.12, 0.08, 5)
-seq.Add af.Show(True)
-lbl.AddAction seq
+Dim blink
+Set blink = af.Sequence()
+blink.Add af.Wait(0.12)     ' visible
+blink.Add af.Show(False)
+blink.Add af.Wait(0.08)     ' hidden
+blink.Add af.Show(True)
+lbl.AddAction af.Repeat(blink, 6)   ' 6 flashes, ends visible, safe to run again
+```
+
+An endless blink is the one counted-free form that is always safe, because it never completes:
+
+```vbscript
+lbl.AddAction af.Blink(0.4, 0.4, -1)
 ```
 
 ## Slide in, hold, slide out (MoveTo with easing)

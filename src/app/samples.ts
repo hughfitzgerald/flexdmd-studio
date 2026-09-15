@@ -129,7 +129,18 @@ Set seq = af.Sequence()
 Set move = af.MoveTo(22, 10, 0.8)
 move.Ease = 20            ' BounceOut (see Interpolation enum in IFlexDMD.cs)
 seq.Add move
-seq.Add af.Blink(0.2, 0.15, 3)
+
+' Blink built from Wait/Show inside a Repeat, NOT af.Blink: a counted af.Blink leaves the actor
+' hidden when it ends and never resets its counter, so inside a loop the label only flashes once
+' on every pass after the first. Wait, Show and Repeat all reset themselves, so this stays correct.
+Dim blink
+Set blink = af.Sequence()
+blink.Add af.Wait(0.2)
+blink.Add af.Show(False)
+blink.Add af.Wait(0.15)
+blink.Add af.Show(True)
+seq.Add af.Repeat(blink, 3)
+
 seq.Add af.Wait(0.5)
 Set move = af.MoveTo(140, 10, 0.5)
 move.Ease = 4             ' QuadIn
@@ -149,7 +160,7 @@ For i = 0 To 7
     d.Fill = True
     d.FillColor = RGB(60, 120, 255)
     d.Thickness = 0
-    d.AddAction d.ActionFactory.Repeat(d.ActionFactory.Blink(0.4, 0.4, -1), -1)
+    d.AddAction d.ActionFactory.Blink(0.4, 0.4, -1)   ' an endless Blink never restarts, so it is safe
     dots.AddActor d
 Next
 scene.AddActor dots

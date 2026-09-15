@@ -43,9 +43,31 @@ saves a debugging round in VPX where errors are silent.
 10. **Monochrome modes convert luminance.** In render modes 0/1 the RGB frame is converted to 4 or 16 shades of
     `FlexDMD.Color`. Colored artwork loses hue; dark reds/blues become near-black. Design in grays for monochrome.
 
-11. **`Blink` counts hide transitions.** `Blink(show, hide, n)` completes after the actor has been hidden n+1
-    times... in practice it ends with the actor **hidden** on the last cycle for repeat ≥ 0. Follow it with
-    `Show(True)` if the actor must stay visible, or use `repeat = -1` with a `RemoveFromParent` elsewhere.
+11. **A counted `Blink` cannot be restarted, and ends hidden.** `BlinkAction` is the one action that does not
+    reset itself: every other action explicitly "prepares for restart" (`Wait` zeroes its timer, `Sequence` its
+    position, `Repeat` its counter), but `Blink` keeps its cycle count and leaves the actor `Visible = False` at
+    the moment it completes. Two consequences:
+    - After `Blink(show, hide, n)` finishes, the actor stays invisible until something shows it again.
+    - Inside a `Repeat` (or any sequence that runs a second time), the retained counter is already past `n`, so on
+      every later pass the actor is shown once, hidden once, and the blink ends immediately. The classic symptom
+      is an animation that looks right the first time and whose text is then "barely there" on every loop.
+
+    Safe uses: `Blink(show, hide, -1)` (endless, never completes, so nothing needs resetting), or a counted blink
+    in a one-shot scene that is discarded afterwards, followed by `Show(True)`. Anywhere that repeats, build the
+    blink from primitives that do reset:
+
+    ```vbscript
+    Dim blink
+    Set blink = af.Sequence()
+    blink.Add af.Wait(0.2)      ' visible
+    blink.Add af.Show(False)
+    blink.Add af.Wait(0.15)     ' hidden
+    blink.Add af.Show(True)
+    seq.Add af.Repeat(blink, 3) ' three flashes, ends visible, correct on every pass
+    ```
+
+    This is engine behaviour, identical in the C# and the C++ (VPX standalone) implementations, so a script that
+    works around it here behaves the same everywhere.
 
 12. **Wait/Sequence timing is frame based.** Durations are accumulated per 60 Hz frame; a `Wait(0.05)` lasts 3
     frames, not exactly 50 ms. A finished action in an actor's list makes the engine skip updating the next
