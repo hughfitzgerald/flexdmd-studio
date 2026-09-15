@@ -2,3 +2,4 @@ node_modules
 dist
 .vite
 e2e-out
+check-out

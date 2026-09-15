@@ -7,7 +7,7 @@
 //                                            [--url http://host/]   (skip the built-in preview server)
 //                                            [--json result.json]   (machine readable result)
 //
-// Requires: npm install (playwright) and a build (npm run build) in FlexDMDStudio; a Chromium for Playwright
+// Requires: npm install (playwright) and a build (npm run build); a Chromium for Playwright
 // (or CHROMIUM_PATH pointing at one). Exit code 1 when the script fails.
 import { spawn } from 'node:child_process';
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
@@ -36,7 +36,7 @@ let url = opt('--url');
 let server = null;
 if (!url) {
   if (!existsSync(resolve(studioDir, 'dist/index.html'))) {
-    console.error('No build found: run "npm run build" in FlexDMDStudio first (or pass --url of a running studio).');
+    console.error('No build found: run "npm run build" first (or pass --url of a running studio).');
     process.exit(2);
   }
   const port = 4200 + Math.floor(Math.random() * 500);

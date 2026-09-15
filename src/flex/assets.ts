@@ -1,4 +1,6 @@
-// Browser port of FlexDMD/AssetManager.cs and BitmapFilter.cs.
+// Ported from FlexDMD (https://github.com/vbousquet/flexdmd), Copyright 2019 Vincent Bousquet,
+// licensed under the Apache License 2.0. TypeScript translation of FlexDMD/AssetManager.cs and FlexDMD/BitmapFilter.cs, modified
+// from the original. See the NOTICE file at the repository root.
 // Assets come from two places: the resources bundled with FlexDMD ("FlexDMD.Resources.xxx", served from ./FlexDMD.Resources/)
 // and a project folder the user opened in the browser (plain files: png/jpg/bmp/gif/mp4/fnt).
 // Loading is asynchronous, but scripts are synchronous: a request for an asset that is not loaded yet throws

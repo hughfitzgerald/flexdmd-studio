@@ -1,4 +1,6 @@
-// Port of FlexDMD/FlexDMD.cs: the root object exposed to scripts, plus the per-frame render step.
+// Ported from FlexDMD (https://github.com/vbousquet/flexdmd), Copyright 2019 Vincent Bousquet,
+// licensed under the Apache License 2.0. TypeScript translation of FlexDMD/FlexDMD.cs, modified
+// from the original. See the NOTICE file at the repository root.
 import { VbArray } from '../vbs/values';
 import { AssetManager, AssetPendingError } from './assets';
 import { Frame, Group } from './actor';

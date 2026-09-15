@@ -1,4 +1,7 @@
-// Port of FlexDMD/Actors/AnimatedActor.cs, ImageSequence.cs, GIFImage.cs and Video.cs
+// Ported from FlexDMD (https://github.com/vbousquet/flexdmd), Copyright 2019 Vincent Bousquet,
+// licensed under the Apache License 2.0. TypeScript translation of FlexDMD/Actors/AnimatedActor.cs, ImageSequence.cs, GIFImage.cs and Video.cs, modified
+// from the original. See the NOTICE file at the repository root.
+// cs, GIFImage.cs and Video.cs
 import { Actor, type Ctx } from './actor';
 import { Alignment, Scaling } from './layout';
 import { drawScaled, Image } from './image';

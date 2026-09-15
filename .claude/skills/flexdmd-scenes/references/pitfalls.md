@@ -1,6 +1,6 @@
 # FlexDMD pitfalls (engine behaviours that surprise people)
 
-Each of these comes straight from the engine code (`FlexDMD/Actors/*.cs`, `FlexDMD/FlexDMD.cs`). Knowing them
+Each of these comes straight from FlexDMD's engine code ([Actors/](https://github.com/vbousquet/flexdmd/blob/master/FlexDMD/Actors/), [FlexDMD.cs](https://github.com/vbousquet/flexdmd/blob/master/FlexDMD/FlexDMD.cs)). Knowing them
 saves a debugging round in VPX where errors are silent.
 
 1. **Actions only run on stage.** `Actor.Update` (which drives actions) is only called for actors reachable from

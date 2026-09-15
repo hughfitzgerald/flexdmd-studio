@@ -1,6 +1,6 @@
 # FlexDMD scene API reference
 
-Source of truth: `FlexDMD/IFlexDMD.cs` (COM interface) and `FlexDMD/Actors/*.cs`. Everything below is the
+Source of truth: FlexDMD's [IFlexDMD.cs](https://github.com/vbousquet/flexdmd/blob/master/FlexDMD/IFlexDMD.cs) (COM interface) and [Actors/](https://github.com/vbousquet/flexdmd/blob/master/FlexDMD/Actors/). Everything below is the
 1.9.x API; the C++ port in Visual Pinball standalone/BGFX implements the same surface.
 
 ## Contents

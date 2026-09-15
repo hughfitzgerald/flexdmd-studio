@@ -1,3 +1,6 @@
+// Ported from FlexDMD (https://github.com/vbousquet/flexdmd), Copyright 2019 Vincent Bousquet,
+// licensed under the Apache License 2.0. TypeScript translation of FlexDMD/Glide/Ease.cs, modified
+// from the original. See the NOTICE file at the repository root.
 // Port of the Glide easing functions used by FlexDMD (FlexDMD/Glide/Ease.cs)
 
 export enum Interpolation {

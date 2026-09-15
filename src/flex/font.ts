@@ -1,4 +1,7 @@
-// Port of FlexDMD/BMFonts (AngelCode BMFont text format) and FlexDMD/Actors/Font.cs (tinting and outlines)
+// Ported from FlexDMD (https://github.com/vbousquet/flexdmd), Copyright 2019 Vincent Bousquet,
+// licensed under the Apache License 2.0. TypeScript translation of FlexDMD/BMFonts/ and FlexDMD/Actors/Font.cs, modified
+// from the original. See the NOTICE file at the repository root.
+// Reads the AngelCode BMFont text format and applies FlexDMD's glyph tinting and 1-dot outlines.
 import { colorsEqual, WHITE, type Color } from './color';
 import type { Ctx } from './actor';
 

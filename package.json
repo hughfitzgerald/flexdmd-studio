@@ -2,7 +2,7 @@
   "name": "flexdmd-studio",
   "private": true,
   "version": "0.1.0",
-  "description": "Browser-based FlexDMD scene editor and previewer (Mac/Linux/Windows)",
+  "description": "Cross-platform browser editor and live previewer for FlexDMD DMD scenes and animations",
   "type": "module",
   "scripts": {
     "dev": "vite",
@@ -28,5 +28,10 @@
     "@codemirror/view": "^6.43.11",
     "codemirror": "^6.0.2",
     "gifuct-js": "^2.1.2"
-  }
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/hughfitzgerald/flexdmd-studio.git"
+  },
+  "homepage": "https://hughfitzgerald.github.io/flexdmd-studio/"
 }

@@ -1,4 +1,7 @@
-// Port of FlexDMD/Actors/Actions.cs. Actions are updated once per frame and return true when finished.
+// Ported from FlexDMD (https://github.com/vbousquet/flexdmd), Copyright 2019 Vincent Bousquet,
+// licensed under the Apache License 2.0. TypeScript translation of FlexDMD/Actors/Actions.cs, modified
+// from the original. See the NOTICE file at the repository root.
+// Actions are updated once per frame and return true when finished.
 import { ease, Interpolation } from './ease';
 import type { Actor, Group } from './actor';
 import type { AnimatedActor } from './animated';

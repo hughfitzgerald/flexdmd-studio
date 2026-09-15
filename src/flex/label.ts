@@ -1,4 +1,6 @@
-// Port of FlexDMD/Actors/Label.cs
+// Ported from FlexDMD (https://github.com/vbousquet/flexdmd), Copyright 2019 Vincent Bousquet,
+// licensed under the Apache License 2.0. TypeScript translation of FlexDMD/Actors/Label.cs, modified
+// from the original. See the NOTICE file at the repository root.
 import { Actor, type Ctx } from './actor';
 import { align, Alignment } from './layout';
 import type { Font } from './font';

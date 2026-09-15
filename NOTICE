@@ -1,0 +1,23 @@
+FlexDMD Studio
+Copyright 2026 FlexDMD Studio contributors
+
+This product includes software derived from FlexDMD
+(https://github.com/vbousquet/flexdmd), Copyright 2019 Vincent Bousquet,
+licensed under the Apache License, Version 2.0.
+
+The scene engine under src/flex/ is a TypeScript translation of FlexDMD's C#
+implementation (FlexDMD/Actors/, FlexDMD/BMFonts/, FlexDMD/AssetManager.cs,
+FlexDMD/BitmapFilter.cs, FlexDMD/FlexDMD.cs and FlexDMD/Glide/Ease.cs). Those
+files have been modified from the originals: they were rewritten in TypeScript
+to render to an HTML canvas, and they record the source positions of script
+values so the editor can write changes back to the script. Behaviour is kept
+deliberately faithful to the original, including quirks, so that scenes
+previewed here behave the same in FlexDMD and in Visual Pinball.
+
+src/flex/layout.ts descends from LibGDX's Scaling class (Copyright LibGDX
+authors, Apache License 2.0), which FlexDMD adapted first.
+
+The bitmap fonts and images under public/FlexDMD.Resources/ are redistributed
+unmodified from FlexDMD's FlexDMD/Resources/.
+
+FlexDMD itself is not affiliated with this project.

@@ -228,7 +228,7 @@ Use `DmdPixels` with `DMDPixels =` for monochrome flashers.
 
 ## Previewing while you work
 
-FlexDMD Studio (`FlexDMDStudio/`, or the GitHub Pages deployment of this repo) runs the same API in a browser:
+FlexDMD Studio (this repository, or its GitHub Pages deployment) runs the same API in a browser:
 paste the scene code (the `FlexDMD` object is pre-created with `Run = True`), watch it, drag actors to adjust
 literal positions, and press the buttons in the *Subs* tab to fire event Subs with arguments. For a headless
-check from a terminal: `node FlexDMDStudio/scripts/check-script.mjs scene.vbs --sub "ShowMessage" --args "\"JACKPOT\", \"1,000,000\", 2" --shots 0.5,1.5`.
+check from a terminal: `node scripts/check-script.mjs scene.vbs --sub "ShowMessage" --args "\"JACKPOT\", \"1,000,000\", 2" --shots 0.5,1.5`.

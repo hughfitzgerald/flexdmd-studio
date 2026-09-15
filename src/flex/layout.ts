@@ -1,4 +1,7 @@
-// Port of FlexDMD/Actors/Layout.cs (itself adapted from LibGDX Scaling)
+// Ported from FlexDMD (https://github.com/vbousquet/flexdmd), Copyright 2019 Vincent Bousquet,
+// licensed under the Apache License 2.0. TypeScript translation of FlexDMD/Actors/Layout.cs, modified
+// from the original. See the NOTICE file at the repository root.
+// FlexDMD adapted these from LibGDX's Scaling (Apache 2.0, Nathan Sweet); see the NOTICE file.
 
 export enum Scaling { Fit = 0, Fill = 1, FillX = 2, FillY = 3, Stretch = 4, StretchX = 5, StretchY = 6, None = 7 }
 

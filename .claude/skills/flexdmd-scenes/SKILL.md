@@ -8,8 +8,8 @@ description: Write, fix and integrate FlexDMD DMD scenes and animations for Visu
 FlexDMD is the DMD renderer used by Visual Pinball tables (Windows via the COM object, macOS/Linux via the C++
 port in VPX standalone/BGFX). Table authors drive it from the table's VBScript. This skill is about writing that
 script: the scene graph, the timing model, the API surface, and the conventions that keep the code working in the
-real engine. The reference for everything here is the C# source in `FlexDMD/` (actors in `FlexDMD/Actors/`,
-interface in `FlexDMD/IFlexDMD.cs`); when in doubt about a behaviour, read it rather than guess.
+real engine. The reference for everything here is FlexDMD's own C# source ([actors](https://github.com/vbousquet/flexdmd/blob/master/FlexDMD/Actors/),
+[interface](https://github.com/vbousquet/flexdmd/blob/master/FlexDMD/IFlexDMD.cs)); when in doubt about a behaviour, read it rather than guess.
 
 ## Mental model (read this before writing anything)
 
@@ -45,11 +45,11 @@ interface in `FlexDMD/IFlexDMD.cs`); when in doubt about a behaviour, read it ra
    that adds it to the stage and schedules its own removal.
 3. **Write the code following the conventions below.** Prefer the built-in fonts unless the table ships its
    own `.fnt`. Keep scene construction, per-event updates and cleanup in separate Subs.
-4. **Verify before handing it over.** If FlexDMD Studio is available (this repo's `FlexDMDStudio/`, or the
+4. **Verify before handing it over.** If FlexDMD Studio is available (this repository, or the
    hosted copy on GitHub Pages), run the scene there: it executes the same API in the browser and flags syntax
    and runtime errors with line numbers. From the command line (needs `npm install` and `npm run build` in
-   `FlexDMDStudio/` once, and a Chromium; set `CHROMIUM_PATH` if Playwright's is not installed):
-   `node FlexDMDStudio/scripts/check-script.mjs scene.vbs --call DMD_Init --call "Jackpot(1500000)" --shots 0.5,2.5`
+   the studio once, and a Chromium; set `CHROMIUM_PATH` if Playwright's is not installed):
+   `node scripts/check-script.mjs scene.vbs --call DMD_Init --call "Jackpot(1500000)" --shots 0.5,2.5`
    runs the script headlessly, calls the listed Subs in order, steps the simulated clock, prints errors and the
    actor tree (absolute bounds, visibility, pending actions) and saves screenshots at the requested times. The
    studio pre-creates `FlexDMD` (and a `Table1` stub with `Filename`); other table objects, timers and

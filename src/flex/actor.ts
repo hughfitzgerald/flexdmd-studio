@@ -1,4 +1,7 @@
-// Port of FlexDMD/Actors/Actor.cs, Group.cs and Frame.cs
+// Ported from FlexDMD (https://github.com/vbousquet/flexdmd), Copyright 2019 Vincent Bousquet,
+// licensed under the Apache License 2.0. TypeScript translation of FlexDMD/Actors/Actor.cs, Group.cs and Frame.cs, modified
+// from the original. See the NOTICE file at the repository root.
+// cs and Frame.cs
 import type { Span } from '../vbs/ast';
 import { hostCallContext } from '../vbs/hostcontext';
 import { Action, ActionFactory } from './actions';
