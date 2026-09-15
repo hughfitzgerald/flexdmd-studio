@@ -45,10 +45,14 @@ interface in `FlexDMD/IFlexDMD.cs`); when in doubt about a behaviour, read it ra
    own `.fnt`. Keep scene construction, per-event updates and cleanup in separate Subs.
 4. **Verify before handing it over.** If FlexDMD Studio is available (this repo's `FlexDMDStudio/`, or the
    hosted copy on GitHub Pages), run the scene there: it executes the same API in the browser and flags syntax
-   and runtime errors with line numbers. From the command line:
-   `node FlexDMDStudio/scripts/check-script.mjs path/to/scene.vbs --sub Jackpot --shots 0.5,2` runs a script
-   headlessly, prints errors and the actor tree, and saves screenshots. Fix everything it reports; a script that
-   errors in the studio errors in VPX too.
+   and runtime errors with line numbers. From the command line (needs `npm install` and `npm run build` in
+   `FlexDMDStudio/` once, and a Chromium; set `CHROMIUM_PATH` if Playwright's is not installed):
+   `node FlexDMDStudio/scripts/check-script.mjs scene.vbs --call DMD_Init --call "Jackpot(1500000)" --shots 0.5,2.5`
+   runs the script headlessly, calls the listed Subs in order, steps the simulated clock, prints errors and the
+   actor tree (absolute bounds, visibility, pending actions) and saves screenshots at the requested times. The
+   studio pre-creates `FlexDMD` (and a `Table1` stub with `Filename`); other table objects, timers and
+   `PlaySound` do not exist there, so keep them out of the DMD Subs or behind `If Not FlexDMD Is Nothing`.
+   Fix everything the checker reports; a script that errors in the studio errors in VPX too.
 5. **Integrate.** For a table, the DMD code lives in the table script: a `DMD_Init` Sub called from
    `Table1_Init`, scene Subs called from game logic, and `FlexDMD.Run = False` in `Table1_Exit`. Guard every
    FlexDMD call with `If Not FlexDMD Is Nothing Then` so the table still runs where FlexDMD is not installed.
@@ -57,8 +61,10 @@ interface in `FlexDMD/IFlexDMD.cs`); when in doubt about a behaviour, read it ra
 
 - Create fonts once (`Set fontScore = FlexDMD.NewFont(...)`) and reuse them; each `NewFont` call re-tints the
   font texture.
-- Give every actor a name and fetch it back with the typed getters (`scene.GetLabel("Score")`) rather than keeping
-  dozens of variables; names are also what the studio's inspector and the Group path lookup use.
+- Give every actor a unique name and fetch it back with the typed getters (`scene.GetLabel("Score")`) rather than
+  keeping dozens of variables. Never give a group and one of its descendants the same name (a group called
+  "Score" holding a label called "Score" makes `GetLabel("Score")` fail: the recursive lookup finds the group
+  first). Suffix scene groups, e.g. `ScoreScene`, `JackpotScene`.
 - Set `FlexDMD.Clear = True` unless the scene deliberately relies on persistence, or make the first child of each
   scene a full-size black image (`FlexDMD.Resources.dmds.black.png` sized `SetSize FlexDMD.Width, FlexDMD.Height`).
 - For monochrome tables draw in white/grays: the render mode converts luminance to the DMD color.

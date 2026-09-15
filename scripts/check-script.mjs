@@ -3,7 +3,7 @@
 // Runs a .vbs through FlexDMD Studio's engine in headless Chromium, reports syntax/runtime errors and the actor
 // tree, optionally calls a Sub, and saves screenshots at given times.
 //
-//   node scripts/check-script.mjs scene.vbs [--sub Name] [--args "1, \"x\""] [--shots 0.5,2] [--out dir]
+//   node scripts/check-script.mjs scene.vbs [--call "Name(args)"]... [--sub Name] [--args "1, \"x\""] [--shots 0.5,2] [--out dir]
 //                                            [--url http://host/]   (skip the built-in preview server)
 //                                            [--json result.json]   (machine readable result)
 //
@@ -24,6 +24,8 @@ if (!file) { console.error('usage: check-script.mjs scene.vbs [--sub Name] [--ar
 const source = readFileSync(file, 'utf8');
 const sub = opt('--sub');
 const subArgs = opt('--args', '');
+// --call "DMD_Init" --call "DMD_Jackpot(1500000)" : Subs invoked in order after the script ran (before --sub)
+const calls = args.map((a, i) => (a === '--call' ? args[i + 1] : null)).filter(Boolean).map((c) => { const m = c.match(/^\s*(\w+)\s*(?:\((.*)\))?\s*$/); return m ? { name: m[1], args: m[2] ?? '' } : null; }).filter(Boolean);
 const shots = (opt('--shots', '1') || '').split(',').map(Number).filter((n) => !Number.isNaN(n));
 const out = resolve(opt('--out', 'check-out'));
 mkdirSync(out, { recursive: true });
@@ -69,8 +71,12 @@ try {
   page.on('pageerror', (e) => { console.error('page error:', e.message); failed = true; });
   await page.goto(url);
   await page.waitForFunction(() => window.studio && window.studio.runner.lastRunSource !== null, null, { timeout: 20000 });
-  // Load the script, pause the clock so screenshots are deterministic, and run it
-  await page.evaluate(() => { window.studio.runner.playing = false; });
+  // Pause the clock and switch off auto-run so nothing re-runs the script behind our back, then run it once
+  await page.evaluate(() => {
+    window.studio.runner.playing = false;
+    const auto = document.querySelector('#chk-autorun');
+    if (auto && auto.checked) auto.click();
+  });
   const err = await page.evaluate(async (src) => {
     window.studio.editor.setText(src);
     return await window.studio.runner.run(src);
@@ -85,7 +91,13 @@ try {
   const logs = await page.evaluate(() => Array.from(document.querySelectorAll('#tab-log .log-line')).map((e) => e.textContent));
   result.logs = logs;
   for (const l of logs) console.log('  log:', l);
-  if (sub && !err) {
+  for (const c of calls) {
+    if (err || result.subError) break;
+    const e3 = await page.evaluate(([name, a]) => window.studio.runner.callSub(name, a), [c.name, c.args]);
+    if (e3) { result.subError = e3; console.error(`SUB ERROR in ${c.name}${e3.line ? ` (line ${e3.line})` : ''}: ${e3.message}`); failed = true; }
+    else console.log(`Called ${c.name}(${c.args}) without errors.`);
+  }
+  if (sub && !err && !result.subError) {
     const e2 = await page.evaluate(([name, a]) => window.studio.runner.callSub(name, a), [sub, subArgs]);
     result.subError = e2;
     if (e2) { console.error(`SUB ERROR in ${sub}${e2.line ? ` (line ${e2.line})` : ''}: ${e2.message}`); failed = true; }
