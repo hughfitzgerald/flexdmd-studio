@@ -83,7 +83,8 @@ src/flex/   Port of the FlexDMD engine: actor.ts (Actor/Group/Frame), label.ts, 
             assets.ts (asset manager and bitmap filters), flexdmd.ts (root object, render step, render modes)
 src/app/    The editor UI: CodeMirror editor, preview canvas with drag/resize, inspector, panels, runner
 tests/      Vitest unit tests for the interpreter and the engine
-scripts/    Playwright smoke tests (need a running `npm run preview` and a Chromium)
+scripts/    Playwright smoke tests, and check-script.mjs: runs a .vbs headlessly, calls Subs, steps the clock,
+            dumps the actor tree and saves screenshots (used by the flexdmd-scenes Claude skill to verify scripts)
 ```
 
 The engine and interpreter are plain TypeScript modules with no UI dependency, so the same core can later be hosted

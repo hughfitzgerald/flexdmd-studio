@@ -67,3 +67,6 @@ saves a debugging round in VPX where errors are silent.
 
 17. **Paths.** `ProjectFolder` is resolved by VPX from the table folder; use `"./Tablename/"` style paths with
     forward slashes. On macOS/Linux (VPX standalone) file names are case sensitive.
+
+18. **There is no Sleep in a table script.** `WScript.Sleep` and `WScript` in general do not exist inside Visual
+    Pinball (or the studio). Never block: express delays as `Wait` actions in a `Sequence`, or with VPX timers.
