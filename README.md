@@ -23,7 +23,13 @@ npm run dev        # http://localhost:5173
 
 `npm run build` produces a static site in `dist/` that can be served from anywhere (or opened through
 `npm run preview`). `npm test` runs the interpreter and engine unit tests; `npm run typecheck` runs the
-TypeScript compiler. Pushing to `main` builds and publishes to GitHub Pages.
+TypeScript compiler.
+
+Pushing to `main` builds and publishes to GitHub Pages; pull requests and other branches build without
+deploying, since the Pages environment only accepts deployments from the default branch. On a fresh fork or
+clone, enable Pages once under **Settings → Pages** with **Source: GitHub Actions**. The workflow asks to create
+the site itself, but the workflow token is usually not permitted to, so the first run fails at `configure-pages`
+until you have done that.
 
 ## Using it
 
