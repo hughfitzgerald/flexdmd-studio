@@ -1,0 +1,62 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>FlexDMD Studio</title>
+    <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='6' fill='%23111'/%3E%3Ccircle cx='10' cy='12' r='3' fill='%23ff5820'/%3E%3Ccircle cx='22' cy='12' r='3' fill='%23ff5820'/%3E%3Ccircle cx='10' cy='21' r='3' fill='%23ff5820'/%3E%3Ccircle cx='16' cy='21' r='3' fill='%23ff5820'/%3E%3Ccircle cx='22' cy='21' r='3' fill='%23ff5820'/%3E%3C/svg%3E" />
+  </head>
+  <body>
+    <div id="app">
+      <header id="toolbar">
+        <span class="brand">FlexDMD Studio</span>
+        <button id="btn-run" title="Run the script (Ctrl/Cmd+Enter)">▶ Run</button>
+        <button id="btn-play" title="Pause / resume the preview clock (Space in preview)">⏸ Pause</button>
+        <button id="btn-step" title="Advance one frame (1/60 s)">⏭ Step</button>
+        <button id="btn-restart" title="Restart the script from time 0">↺ Restart</button>
+        <label>Speed <select id="sel-speed"><option>0.1</option><option>0.25</option><option>0.5</option><option selected>1</option><option>2</option><option>4</option></select></label>
+        <span class="sep"></span>
+        <label><input type="checkbox" id="chk-dots" checked /> DMD dots</label>
+        <label><input type="checkbox" id="chk-autorun" checked /> Auto-run</label>
+        <span class="sep"></span>
+        <button id="btn-open-folder" title="Open the project folder containing your images, fonts and videos">📁 Open folder</button>
+        <button id="btn-open-script" title="Open a .vbs script">📄 Open script</button>
+        <button id="btn-save-script" title="Download the script as .vbs">💾 Save</button>
+        <label>Samples <select id="sel-sample"><option value="">…</option></select></label>
+        <label title="Play a sound from the project folder in sync with the preview clock">🔊 <select id="sel-sound"><option value="">none</option></select></label>
+        <input type="file" id="file-folder" webkitdirectory multiple hidden />
+        <input type="file" id="file-script" accept=".vbs,.txt" hidden />
+        <span class="spacer"></span>
+        <span id="status" class="status"></span>
+      </header>
+      <main id="main">
+        <section id="editor-pane"><div id="editor"></div></section>
+        <div id="splitter" title="Drag to resize"></div>
+        <section id="side-pane">
+          <div id="preview-wrap">
+            <canvas id="preview" tabindex="0"></canvas>
+            <div id="preview-info"></div>
+          </div>
+          <div id="tabs">
+            <nav>
+              <button data-tab="inspector" class="active">Inspector</button>
+              <button data-tab="subs">Subs</button>
+              <button data-tab="assets">Assets</button>
+              <button data-tab="log">Log <span id="log-badge" hidden></span></button>
+              <button data-tab="help">Help</button>
+            </nav>
+            <div class="tab active" id="tab-inspector">
+              <div id="actor-tree"></div>
+              <div id="actor-props"></div>
+            </div>
+            <div class="tab" id="tab-subs"></div>
+            <div class="tab" id="tab-assets"></div>
+            <div class="tab" id="tab-log"></div>
+            <div class="tab" id="tab-help"></div>
+          </div>
+        </section>
+      </main>
+    </div>
+    <script type="module" src="/src/app/main.ts"></script>
+  </body>
+</html>

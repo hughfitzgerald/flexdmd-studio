@@ -1,0 +1,200 @@
+export interface Sample { name: string; source: string; }
+
+export const SAMPLES: Sample[] = [
+  {
+    name: 'Two scenes (FlexDMDUI default)',
+    source: `' The classic FlexDMDUI sample: two scenes alternating every 5 seconds.
+Dim font
+Set font = FlexDMD.NewFont("FlexDMD.Resources.teeny_tiny_pixls-5.fnt", vbWhite, vbWhite, 0)
+
+Dim scene1
+Set scene1 = FlexDMD.NewGroup("Scene 1")
+scene1.AddActor FlexDMD.NewImage("Back", "FlexDMD.Resources.dmds.black.png")
+scene1.AddActor FlexDMD.NewLabel("Label", font, "Welcome to FlexDMD")
+scene1.GetLabel("Label").SetAlignedPosition 64, 16, 4
+
+Dim scene2
+Set scene2 = FlexDMD.NewGroup("Scene 2")
+scene2.AddActor FlexDMD.NewImage("Back", "FlexDMD.Resources.dmds.black.png")
+scene2.AddActor FlexDMD.NewLabel("Label", font, "Enjoy!")
+scene2.GetLabel("Label").SetAlignedPosition 64, 16, 4
+
+Dim sequence
+Set sequence = FlexDMD.NewGroup("Sequence")
+sequence.SetSize 128, 32
+Set af = sequence.ActionFactory
+Set list = af.Sequence()
+list.Add af.AddChild(scene1)
+list.Add af.Wait(5)
+list.Add af.RemoveChild(scene1)
+list.Add af.AddChild(scene2)
+list.Add af.Wait(5)
+list.Add af.RemoveChild(scene2)
+sequence.AddAction af.Repeat(list, -1)
+
+FlexDMD.LockRenderThread
+FlexDMD.Stage.RemoveAll
+FlexDMD.Stage.AddActor sequence
+FlexDMD.UnlockRenderThread
+`,
+  },
+  {
+    name: 'Score layout with frames and Subs',
+    source: `' A score scene: select the labels/frame in the preview and drag them, the SetAlignedPosition / SetBounds
+' literals below update live. Use the "Subs" tab to trigger the jackpot animation.
+FlexDMD.RenderMode = 1          ' 0 = 4 shades, 1 = 16 shades, 2 = RGB
+FlexDMD.Color = RGB(255, 88, 32)
+FlexDMD.Clear = True
+
+Dim bigFont, smallFont, dimFont
+Set bigFont = FlexDMD.NewFont("FlexDMD.Resources.udmd-f7by13.fnt", vbWhite, vbWhite, 0)
+Set smallFont = FlexDMD.NewFont("FlexDMD.Resources.udmd-f5by7.fnt", vbWhite, vbWhite, 0)
+Set dimFont = FlexDMD.NewFont("FlexDMD.Resources.teeny_tiny_pixls-5.fnt", RGB(120, 120, 120), vbWhite, 0)
+
+Dim scene
+Set scene = FlexDMD.NewGroup("Score")
+scene.SetSize 128, 32
+
+Dim frame
+Set frame = FlexDMD.NewFrame("Border")
+frame.SetBounds 1, 1, 126, 30
+frame.Thickness = 1
+frame.BorderColor = RGB(90, 90, 90)
+scene.AddActor frame
+
+Dim score
+Set score = FlexDMD.NewLabel("Score", bigFont, "1,250,000")
+score.SetAlignedPosition 64, 12, 4
+scene.AddActor score
+
+Dim player
+Set player = FlexDMD.NewLabel("Player", smallFont, "PLAYER 1")
+player.SetAlignedPosition 4, 29, 6
+scene.AddActor player
+
+Dim ball
+Set ball = FlexDMD.NewLabel("Ball", smallFont, "BALL 2")
+ball.SetAlignedPosition 124, 29, 8
+scene.AddActor ball
+
+FlexDMD.Stage.AddActor scene
+
+Sub SetScore(value)
+    score.Text = FormatNumber(value, 0)
+    score.SetAlignedPosition 64, 12, 4
+End Sub
+
+Sub Jackpot(value)
+    Dim jp, af, seq
+    Set jp = FlexDMD.NewGroup("Jackpot")
+    jp.SetSize 128, 32
+    jp.ClearBackground = True
+    Dim lbl
+    Set lbl = FlexDMD.NewLabel("Text", bigFont, "JACKPOT" & vbCrLf & FormatNumber(value, 0))
+    lbl.SetBounds 0, 0, 128, 32
+    jp.AddActor lbl
+    Set af = lbl.ActionFactory
+    lbl.AddAction af.Blink(0.15, 0.1, 6)
+    ' Show the scene on top of the stage, then remove it after 2 seconds
+    Set af = jp.ActionFactory
+    Set seq = af.Sequence()
+    seq.Add af.Wait(2)
+    seq.Add af.RemoveFromParent()
+    jp.AddAction seq
+    FlexDMD.Stage.AddActor jp
+End Sub
+`,
+  },
+  {
+    name: 'Animations: MoveTo, easing, Blink',
+    source: `' Action sequences: a label bounces in with easing, blinks, then slides out.
+FlexDMD.RenderMode = 2
+Dim font
+Set font = FlexDMD.NewFont("FlexDMD.Resources.bm_army-12.fnt", RGB(255, 200, 60), RGB(120, 40, 0), 1)
+
+Dim scene
+Set scene = FlexDMD.NewGroup("Anim")
+scene.SetSize 128, 32
+scene.ClearBackground = True
+
+Dim title
+Set title = FlexDMD.NewLabel("Title", font, "MULTIBALL")
+title.Pack
+title.SetPosition -100, 10
+scene.AddActor title
+
+Dim af, seq, move
+Set af = title.ActionFactory
+Set seq = af.Sequence()
+Set move = af.MoveTo(22, 10, 0.8)
+move.Ease = 20            ' BounceOut (see Interpolation enum in IFlexDMD.cs)
+seq.Add move
+seq.Add af.Blink(0.2, 0.15, 3)
+seq.Add af.Wait(0.5)
+Set move = af.MoveTo(140, 10, 0.5)
+move.Ease = 4             ' QuadIn
+seq.Add move
+seq.Add af.Wait(0.3)
+Set move = af.MoveTo(-100, 10, 0)
+seq.Add move
+title.AddAction af.Repeat(seq, -1)
+
+Dim dots, i
+Set dots = FlexDMD.NewGroup("Dots")
+dots.SetBounds 0, 28, 128, 4
+For i = 0 To 7
+    Dim d
+    Set d = FlexDMD.NewFrame("Dot" & i)
+    d.SetBounds i * 16 + 6, 0, 4, 3
+    d.Fill = True
+    d.FillColor = RGB(60, 120, 255)
+    d.Thickness = 0
+    d.AddAction d.ActionFactory.Repeat(d.ActionFactory.Blink(0.4, 0.4, -1), -1)
+    dots.AddActor d
+Next
+scene.AddActor dots
+
+FlexDMD.Stage.AddActor scene
+`,
+  },
+  {
+    name: 'Project folder assets (image, GIF, video)',
+    source: `' Open the folder containing your assets with "Open folder", then reference them by name.
+' Paths are resolved relative to the opened folder (FlexDMD.ProjectFolder is honoured).
+FlexDMD.ProjectFolder = "./"
+FlexDMD.RenderMode = 2
+
+Dim scene
+Set scene = FlexDMD.NewGroup("Scene")
+scene.SetSize 128, 32
+
+' A still image scaled to fit (Scaling: 0 Fit, 1 Fill, 4 Stretch, 7 None)
+Dim back
+Set back = FlexDMD.NewImage("Back", "background.png")
+If Not back Is Nothing Then
+    back.SetBounds 0, 0, 128, 32
+    back.Scaling = 4
+    scene.AddActor back
+End If
+
+' An animated GIF or an MP4 video (NewVideo returns Nothing when the file is missing)
+Dim vid
+Set vid = FlexDMD.NewVideo("Vid", "animation.gif")
+If Not vid Is Nothing Then
+    vid.SetBounds 80, 0, 48, 32
+    vid.Scaling = 0
+    vid.Loop = True
+    scene.AddActor vid
+End If
+
+Dim font
+Set font = FlexDMD.NewFont("FlexDMD.Resources.udmd-f5by7.fnt", vbWhite, vbBlack, 1)
+Dim lbl
+Set lbl = FlexDMD.NewLabel("Label", font, "ASSETS")
+lbl.SetAlignedPosition 4, 4, 0
+scene.AddActor lbl
+
+FlexDMD.Stage.AddActor scene
+`,
+  },
+];
