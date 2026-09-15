@@ -23,6 +23,18 @@ npm run dev        # opens http://localhost:5173
 `npm run preview`). `npm test` runs the interpreter and engine unit tests; `npm run typecheck` runs the TypeScript
 compiler.
 
+### Hosting on GitHub Pages
+
+The app is fully static, so the repository ships a workflow (`.github/workflows/studio-pages.yml`) that builds it
+and publishes it to GitHub Pages. To enable it on your fork:
+
+1. In the repository settings, open **Pages** and set **Source** to **GitHub Actions**.
+2. Push to `master` (any change under `FlexDMDStudio/`), or run the workflow manually from the **Actions** tab,
+   where you can also pick another branch to deploy.
+
+The site is then served at `https://<user>.github.io/<repo>/`. Everything runs in the browser: scripts stay in
+your browser's local storage and project folders are read locally, nothing is uploaded.
+
 ## Using it
 
 - **Script pane** (left): a `FlexDMD` object is pre-created with `Run = True`, exactly like the FlexDMDUI design
