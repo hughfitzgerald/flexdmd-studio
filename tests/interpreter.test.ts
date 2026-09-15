@@ -128,6 +128,11 @@ describe('VBScript interpreter', () => {
     expect(it.getGlobal('a')).toBe('3|.5|2|4|FF|ell|1,234.5');
   });
 
+  it('supports multiple constants in one Const statement', () => {
+    const { it } = run('Const A = 1, B = 2, C = A + B\nx = C * 10');
+    expect(it.getGlobal('x')).toBe(30);
+  });
+
   it('aborts runaway loops', () => {
     expect(() => run('Do\nLoop')).toThrow(/execution budget/);
   });

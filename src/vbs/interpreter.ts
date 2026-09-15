@@ -170,6 +170,7 @@ export class Interpreter {
         return;
       }
       case 'const': scope.vars.set(s.name, this.evalExpr(s.value, scope)); return;
+      case 'constlist': for (const d of s.decls) scope.vars.set(d.name, this.evalExpr(d.value, scope)); return;
       case 'assign': this.assign(s.target, this.evalExpr(s.value, scope), scope, s.value); return;
       case 'call': this.execCall(s.callee, s.args, scope, s.span); return;
       case 'if':

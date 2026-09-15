@@ -180,11 +180,16 @@ class Parser {
   }
 
   private parseConst(span: Span, _access: string): Stmt {
-    const name = this.identName();
-    this.expect('op', '=');
-    const value = this.parseExpr();
+    // Const a = 1, b = 2 declares several constants; represent extras as inline assignments
+    const decls: { name: string; value: Expr }[] = [];
+    do {
+      const name = this.identName();
+      this.expect('op', '=');
+      decls.push({ name, value: this.parseExpr() });
+    } while (this.accept('op', ','));
     this.endStatement();
-    return { kind: 'const', name, value, span: this.spanFrom(span) };
+    if (decls.length === 1) return { kind: 'const', name: decls[0].name, value: decls[0].value, span: this.spanFrom(span) };
+    return { kind: 'constlist', decls, span: this.spanFrom(span) };
   }
 
   private parseAssignOrCall(isSet: boolean): Stmt {

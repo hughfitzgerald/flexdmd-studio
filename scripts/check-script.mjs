@@ -51,12 +51,13 @@ if (!url) {
 async function readTree(page) {
   return page.evaluate(() => {
     const items = [];
-    const visit = (a, depth, path) => {
+    const visit = (a, depth, path, ox, oy, shown) => {
       const p = path ? `${path}/${a.Name}` : a.Name;
-      items.push({ depth, path: p, name: a.Name, type: a.typeName, x: Math.round(a.X * 100) / 100, y: Math.round(a.Y * 100) / 100, w: Math.round(a.Width), h: Math.round(a.Height), visible: !!a.Visible, actions: a.actions.map((x) => x.describe()) });
-      if (a.Children) for (const c of a.Children) visit(c, depth + 1, p);
+      const ax = ox + a.X, ay = oy + a.Y, vis = shown && !!a.Visible;
+      items.push({ depth, path: p, name: a.Name, type: a.typeName, x: Math.round(a.X * 100) / 100, y: Math.round(a.Y * 100) / 100, ax: Math.round(ax * 100) / 100, ay: Math.round(ay * 100) / 100, w: Math.round(a.Width), h: Math.round(a.Height), visible: !!a.Visible, shown: vis, actions: a.actions.map((x) => x.describe()) });
+      if (a.Children) for (const c of a.Children) visit(c, depth + 1, p, ax, ay, vis);
     };
-    visit(window.studio.runner.flex.Stage, 0, '');
+    visit(window.studio.runner.flex.Stage, 0, '', 0, 0, true);
     return items;
   });
 }
