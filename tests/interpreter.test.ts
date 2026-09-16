@@ -248,6 +248,26 @@ describe('VBScript interpreter', () => {
     expect(interp.getGlobal('after')).toBe(2);
   });
 
+  it('shares an undeclared variable between Subs while standing in for the rest of a script', () => {
+    const ghosts = new GhostRegistry();
+    const interp = new Interpreter({ ghosts });
+    interp.run(`
+      Sub Build()
+        Shared = "from build"      ' no Dim: the real script declares it elsewhere
+        Dim priv : priv = "local"
+      End Sub
+      Sub Tick()
+        Seen = Shared
+        SawPriv = priv             ' a name the other Sub did declare stays private to it
+      End Sub
+      Build
+      Tick
+    `);
+    expect(interp.getGlobal('Seen')).toBe('from build');
+    expect(interp.getGlobal('SawPriv')).toBeInstanceOf(Object); // stood in for, not leaked
+    expect(ghosts.published()).toContain('shared');
+  });
+
   it('aborts runaway loops', () => {
     expect(() => run('Do\nLoop')).toThrow(/execution budget/);
   });

@@ -101,12 +101,12 @@ try {
   for (const sk of result.skipped) console.log(`  skipped line ${sk.line}: ${sk.message}`);
   for (const c of calls) {
     if (err || result.subError) break;
-    const e3 = await page.evaluate(([name, a]) => window.studio.runner.callSub(name, a), [c.name, c.args]);
+    const e3 = await page.evaluate(([name, a]) => window.studio.runner.callParsed(a ? `${name}(${a})` : name), [c.name, c.args]);
     if (e3) { result.subError = e3; console.error(`SUB ERROR in ${c.name}${e3.line ? ` (line ${e3.line})` : ''}: ${e3.message}`); failed = true; }
     else console.log(`Called ${c.name}(${c.args}) without errors.`);
   }
   if (sub && !err && !result.subError) {
-    const e2 = await page.evaluate(([name, a]) => window.studio.runner.callSub(name, a), [sub, subArgs]);
+    const e2 = await page.evaluate(([name, a]) => window.studio.runner.callParsed(a ? `${name}(${a})` : name), [sub, subArgs]);
     result.subError = e2;
     if (e2) { console.error(`SUB ERROR in ${sub}${e2.line ? ` (line ${e2.line})` : ''}: ${e2.message}`); failed = true; }
     else console.log(`Called ${sub}(${subArgs}) without errors.`);

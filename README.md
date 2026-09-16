@@ -48,13 +48,18 @@ until you have done that.
 
 ### The run bar
 
-- **On run** — a Sub called once after the script runs, for the table's or framework's init.
+- **On run** — a Sub called once after the script runs, for the table's or framework's init. A scene *Builder*
+  can go here directly: name it on its own and, because it is declared to take the entry its framework would have
+  passed, the studio hands it one whose `SetScene` puts the scene on the display. So a pair of Subs pasted out of
+  a scenes file previews with `DmdBuild_Score` on run and `DmdTick_Score` each frame, and nothing else.
 - **Each frame** — a Sub called before every frame, standing in for the table's DMD timer. `FlexFrame` counts up
   for it, so tickers that key on frame numbers behave as they do in the table. An error here stops the ticking
   rather than repeating it sixty times a second.
 - **Stub unknowns** — on by default. Turn it off and every unknown name is an error again, which is what you want
-  while debugging your own scene code. The **Stubs** tab lists what was stood in for, and flags names that look
-  like a `Dim` left behind in a file you have not loaded.
+  while debugging your own scene code. The **Stubs** tab lists what was stood in for. It also lists variables a
+  Sub assigned without a top-level `Dim`, which the studio shares between Subs: VBScript would keep each one
+  private to its Sub, but in an excerpt the `Dim` that would have shared them is in a file you have not loaded,
+  which is why a font a Builder creates is visible to its Ticker here.
 - **Insert constants** — pastes the `FlexDMD_Align_*` / `FlexDMD_RenderMode_*` block that tables carry, so a
   script written here stays portable. The studio defines those names anyway, block or no block.
 

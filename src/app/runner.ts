@@ -4,6 +4,7 @@ import type { Span } from '../vbs/ast';
 import { FlexDMD, type LogLevel } from '../flex/flexdmd';
 import { constantGlobals } from '../flex/constants';
 import { VbDictionary } from '../vbs/dictionary';
+import { SceneEntry } from './sceneentry';
 import { AssetPendingError } from '../flex/assets';
 import type { ProcDecl } from '../vbs/ast';
 
@@ -34,6 +35,8 @@ const MAX_RELOADS = 12;
 export class Runner {
   readonly flex = new FlexDMD();
   readonly ghosts = new GhostRegistry();
+  /** Handed to a Builder that expects its framework to pass it one; its SetScene shows the scene. */
+  readonly sceneEntry: SceneEntry;
   interp: Interpreter | null = null;
   entryPoints: EntryPoints = { onRun: '', perFrame: '' };
   /** Frame counter exposed to scripts as FlexFrame, the way table DMD timers count frames */
@@ -57,6 +60,7 @@ export class Runner {
   skipped: SkippedStatement[] = [];
 
   constructor(private ev: RunnerEvents) {
+    this.sceneEntry = new SceneEntry(this.flex, this.ghosts);
     this.flex.onLog = (l, m) => ev.onLog(l, m);
     this.flex.AssetManager.clockRunning = this._playing;
   }
@@ -124,7 +128,26 @@ export class Runner {
   callParsed(call: string): ScriptError | null {
     const m = call.trim().match(/^(\w+)\s*(?:\((.*)\))?\s*$/);
     if (!m) return { message: `Not a Sub call: ${call}`, line: null, span: null };
-    return this.callSub(m[1], m[2] ?? '');
+    const [, name, argText] = m;
+    // A Builder or Ticker named on its own, but declared with arguments, is one a framework would
+    // have called with an entry. Hand it the studio's stand-in so its scene reaches the display.
+    if ((argText === undefined || argText.trim() === '') && this.interp && this.interp.procParams(name) > 0) {
+      return this.callSubValues(name, [this.sceneEntry]);
+    }
+    return this.callSub(name, argText ?? '');
+  }
+
+  /** Invokes a Sub with values the studio already holds, rather than with text to evaluate. */
+  callSubValues(name: string, args: VbValue[]): ScriptError | null {
+    if (!this.interp) return { message: 'No script is loaded', line: null, span: null };
+    try {
+      this.interp.callProc(name, args);
+      this.dirty = true;
+      return null;
+    } catch (e) {
+      if (this.flex.AssetManager.hasPending) void this.flex.AssetManager.loadPending();
+      return toScriptError(e);
+    }
   }
 
   /** Advances exactly one frame while paused */
@@ -155,7 +178,7 @@ export class Runner {
         const interp = new Interpreter({
           // FlexFrame is the frame counter table DMD timers count on; the studio advances it.
           // Everything else a table script reaches for (Table1, lights, timers) is stood in for.
-          globals: { ...constantGlobals(), FlexDMD: flex, FlexFrame: 0 },
+          globals: { ...constantGlobals(), FlexDMD: flex, FlexFrame: 0, Studio: this.sceneEntry },
           ghosts: this.ghosts,
           // Only while standing in for a table: a broken line of playfield setup should not stop
           // the DMD code below it from being previewed.

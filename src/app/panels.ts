@@ -109,7 +109,9 @@ ready to copy and edit.</li>
 
 <h3>The run bar</h3>
 <ul>
-<li><b>On run</b> — a Sub called once after the script runs, for the table's or framework's init.</li>
+<li><b>On run</b> — a Sub called once after the script runs, for the table's or framework's init. A scene
+<b>Builder</b> can go here directly: name it on its own and, because it is declared to take the entry its framework
+would have passed, the studio hands it one whose <code>SetScene</code> puts the scene on the display.</li>
 <li><b>Each frame</b> — a Sub called before every frame, standing in for the table's DMD timer. <code>FlexFrame</code> counts up for it, so
 tickers that key on frame numbers work. An error here stops the ticking rather than repeating it sixty times a second.</li>
 <li><b>Stub unknowns</b> — on by default. Turn it off to have every unknown name reported as an error, which is what you want while

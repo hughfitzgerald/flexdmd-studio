@@ -146,6 +146,11 @@ export class Interpreter {
     this.execBlock(prog.body, this.globalScope);
   }
 
+  /** How many arguments a Sub or Function declares, or -1 when there is no such procedure. */
+  procParams(name: string): number {
+    return this.procs.get(name.toLowerCase())?.params.length ?? -1;
+  }
+
   /** Lists user-defined procedures (Subs/Functions) so the UI can offer to invoke them. */
   listProcs(): ProcDecl[] { return [...this.procs.values()]; }
 
@@ -345,8 +350,17 @@ export class Interpreter {
         // Assigning to the function name sets the return value
         if (scope.returnSlot && target.name === scope.procName) { scope.vars.set(scope.returnSlot, value); return; }
         if (scope.self && !scope.vars.has(target.name) && scope.self.fields.has(target.name)) { this.classSet(scope.self, target.name, [], value, scope); return; }
-        const s = scope.lookup(target.name) ?? scope;
-        s.vars.set(target.name, value);
+        const found = scope.lookup(target.name);
+        if (found) { found.vars.set(target.name, value); return; }
+        // Undeclared. VBScript makes it local to this Sub, which is right when the whole script is
+        // here — but in an excerpt the "Dim" that would have made it shared lives in a file that is
+        // not loaded, so while standing in for the rest of the script, publish it globally too.
+        // Anything the script does declare keeps ordinary local scope, so this cannot disturb it.
+        scope.vars.set(target.name, value);
+        if (this.ghosts?.enabled && scope !== this.globalScope) {
+          this.globalScope.vars.set(target.name, value);
+          this.ghosts.publish(target.name);
+        }
         return;
       }
       case 'with': throw new VbsRuntimeError('Invalid assignment target', target.span);
@@ -635,7 +649,11 @@ export class Interpreter {
     if (obj instanceof ClassInstance) return this.classGet(obj, name, args, scope, span, argExprs);
     if (obj instanceof VbArray || typeof obj !== 'object') throw new VbsRuntimeError(`Object required: '${typeName(obj)}' has no member '${name}'`, span, 424);
     const key = this.hostKey(obj, name);
-    if (key === undefined) throw new VbsRuntimeError(`Object doesn't support this property or method: '${name}'`, span, 438);
+    if (key === undefined) {
+      const fallback = (obj as { vbFallback?: (n: string, a: VbValue[]) => VbValue }).vbFallback;
+      if (typeof fallback === 'function') return fallback.call(obj, name, args);
+      throw new VbsRuntimeError(`Object doesn't support this property or method: '${name}'`, span, 438);
+    }
     const host = obj as Record<string, unknown>;
     const v = host[key];
     if (typeof v === 'function') {
@@ -662,7 +680,11 @@ export class Interpreter {
     if (obj instanceof ClassInstance) { this.classSet(obj, name, args, value, scope); return; }
     if (obj instanceof VbArray || typeof obj !== 'object') throw new VbsRuntimeError(`Object required: '${typeName(obj)}' has no member '${name}'`, span, 424);
     const key = this.hostKey(obj, name);
-    if (key === undefined) throw new VbsRuntimeError(`Object doesn't support this property or method: '${name}'`, span, 438);
+    if (key === undefined) {
+      const fallback = (obj as { vbFallback?: (n: string, a: VbValue[]) => VbValue }).vbFallback;
+      if (typeof fallback === 'function') { fallback.call(obj, name, args); return; }
+      throw new VbsRuntimeError(`Object doesn't support this property or method: '${name}'`, span, 438);
+    }
     if (args.length > 0) {
       const setter = (obj as { vbSetIndexed?: (n: string, a: VbValue[], v: VbValue) => boolean }).vbSetIndexed;
       if (typeof setter === 'function' && setter.call(obj, name, args, value)) return;

@@ -72,6 +72,15 @@ export class StubsPanel {
         + 'Untick <b>Stub unknowns</b> in the run bar to have them reported as errors instead.'
       : 'Stubbing is off, so an unknown name is an error. Tick <b>Stub unknowns</b> in the run bar to let a whole table script run.';
     this.el.appendChild(intro);
+    const published = this.ghosts.published();
+    if (published.length) {
+      const note = document.createElement('div');
+      note.style.marginBottom = '8px';
+      note.innerHTML = `<b>Shared between Subs:</b> <span class="muted">${published.join(', ')}</span><br>`
+        + '<span class="muted">Assigned inside a Sub without a <code>Dim</code> at the top level. VBScript would keep each one private to its Sub; '
+        + 'the studio shares them, because the <code>Dim</code> that would have done so lives in a file you have not loaded.</span>';
+      this.el.appendChild(note);
+    }
     if (entries.length === 0) {
       const none = document.createElement('div');
       none.className = 'muted';

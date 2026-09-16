@@ -32,11 +32,22 @@ export class GhostRegistry {
     return this.touch(`${target.path}.${name}${called ? '()' : ''}`);
   }
 
+  private _published = new Set<string>();
+
+  /**
+   * Records a variable that a Sub assigned without declaring, which the studio also made global so
+   * the rest of an excerpt can see it. The complete script would have declared it with Dim.
+   */
+  publish(name: string) { this._published.add(name); }
+
+  /** Variables shared across Subs on the studio's initiative. */
+  published(): string[] { return [...this._published].sort(); }
+
   /** What was stubbed, most used first. */
   list(): { path: string; count: number }[] {
     return [...this._counts.entries()].map(([path, count]) => ({ path, count })).sort((a, b) => b.count - a.count || a.path.localeCompare(b.path));
   }
 
   get size() { return this._counts.size; }
-  clear() { this._counts.clear(); this._cache.clear(); }
+  clear() { this._counts.clear(); this._cache.clear(); this._published.clear(); }
 }
