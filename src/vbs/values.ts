@@ -1,4 +1,5 @@
 import type { Span } from './ast';
+import { Ghost } from './ghost';
 
 // ---- Runtime value model ----
 // number | string | boolean          → VBScript numeric/string/boolean variants
@@ -54,6 +55,8 @@ export class VbArray {
       this.data = new Array(this.size()).fill(undefined);
       return;
     }
+    // "Dim a()" makes a dimensionless array; the first ReDim Preserve on it has nothing to keep
+    if (this.dims.length === 0) { this.dims = dims.slice(); this.data = new Array(this.size()).fill(undefined); return; }
     if (dims.length !== this.dims.length) throw new VbsRuntimeError('ReDim Preserve cannot change the number of dimensions', null, 9);
     const old = this.data;
     const oldDims = this.dims;
@@ -73,6 +76,7 @@ export class VbArray {
 // ---- Conversions ----
 
 export function typeName(v: VbValue): string {
+  if (v instanceof Ghost) return 'Object';
   if (v === undefined) return 'Empty';
   if (v === null) return 'Nothing';
   if (v instanceof VbNullType) return 'Null';
@@ -90,6 +94,7 @@ export function isObjectValue(v: VbValue): boolean {
 
 export function toNumber(v: VbValue, what = 'value'): number {
   if (typeof v === 'number') return v;
+  if (v instanceof Ghost) return 0;
   if (typeof v === 'boolean') return v ? -1 : 0;
   if (v === undefined) return 0;
   if (typeof v === 'string') {
@@ -120,6 +125,7 @@ export function roundHalfEven(n: number): number {
 
 export function toBool(v: VbValue): boolean {
   if (typeof v === 'boolean') return v;
+  if (v instanceof Ghost) return false;
   if (typeof v === 'number') return v !== 0;
   if (v === undefined) return false;
   if (typeof v === 'string') {
@@ -145,6 +151,7 @@ export function formatNumber(n: number): string {
 
 export function toStr(v: VbValue): string {
   if (typeof v === 'string') return v;
+  if (v instanceof Ghost) return '';
   if (typeof v === 'number') return formatNumber(v);
   if (typeof v === 'boolean') return v ? 'True' : 'False';
   if (v === undefined) return '';

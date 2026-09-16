@@ -94,26 +94,67 @@ export function renderHelp(el: HTMLElement) {
 <h3>What this is</h3>
 <p>A browser re-implementation of the FlexDMD scene engine (actors, actions, bitmap fonts, render modes) with a VBScript interpreter,
 so you can write the DMD part of a table script on any OS and watch it run. Scripts you write here run unchanged in FlexDMD / Visual Pinball.</p>
-<h3>Script model</h3>
-<p>Like FlexDMDUI, a <code>FlexDMD</code> object is pre-created with <code>Run = True</code>; <code>CreateObject("FlexDMD.FlexDMD")</code> returns the same object,
-so table-style initialisation code also works. Everything else is plain FlexDMD API: <code>NewGroup</code>, <code>NewImage</code>, <code>NewLabel</code>, <code>NewFont</code>,
-<code>NewVideo</code>, <code>NewFrame</code>, <code>ActionFactory</code> (Wait, Delayed, Sequence, Parallel, Repeat, Blink, Show, AddTo, RemoveFromParent, AddChild, RemoveChild, Seek, MoveTo).</p>
-<h3>Assets</h3>
-<p>Click <b>Open folder</b> and pick the folder that holds your PNG/JPG/GIF/MP4/FNT files. Script paths resolve against it, honouring <code>FlexDMD.ProjectFolder</code>.
-Image options work as in FlexDMD: <code>image.png&amp;dmd=2</code>, <code>&amp;add</code>, <code>&amp;region=x,y,w,h</code>, <code>&amp;pad=l,t,r,b</code>; image sequences with <code>a.png|b.png|c.png</code>.
-VPX-embedded resources (<code>VPX.name</code>) and WMV/AVI videos are not supported in the browser.</p>
+
+<h3>Three ways to use it</h3>
+<ul>
+<li><b>A scene on its own.</b> A <code>FlexDMD</code> object is pre-created with <code>Run = True</code>, so you can write scene code straight
+away, like the FlexDMDUI design tab. Start from the Samples menu.</li>
+<li><b>A whole table script.</b> Paste or open one. Everything it reaches for that this is not — the table, lights, timers, sound, the
+framework — is stood in for, and any line of setup that still fails is skipped and listed. Set <b>On run</b> to the table's init Sub
+(often <code>Table1_Init</code>) to build its DMD.</li>
+<li><b>Files out of a larger project.</b> Open the folder and tick the files you want in the <b>Files</b> tab. Frameworks usually split the
+DMD across a config file and a scenes file, with the glue elsewhere; <code>examples/studio-harness.vbs</code> in this repository is that glue,
+ready to copy and edit.</li>
+</ul>
+
+<h3>The run bar</h3>
+<ul>
+<li><b>On run</b> — a Sub called once after the script runs, for the table's or framework's init.</li>
+<li><b>Each frame</b> — a Sub called before every frame, standing in for the table's DMD timer. <code>FlexFrame</code> counts up for it, so
+tickers that key on frame numbers work. An error here stops the ticking rather than repeating it sixty times a second.</li>
+<li><b>Stub unknowns</b> — on by default. Turn it off to have every unknown name reported as an error, which is what you want while
+debugging your own scene code. The <b>Stubs</b> tab lists what was stood in for.</li>
+<li><b>Insert constants</b> — pastes the <code>FlexDMD_Align_*</code> / <code>FlexDMD_RenderMode_*</code> block tables use, so your script stays
+portable. The studio defines those names anyway, with or without the block.</li>
+</ul>
+
+<h3>Editing</h3>
+<ul>
+<li><kbd>Ctrl/Cmd</kbd>+<kbd>Enter</kbd> runs. <kbd>Ctrl/Cmd</kbd>+<kbd>Shift</kbd>+<kbd>Enter</kbd> runs just the selected lines on top of
+what is already loaded, without resetting the stage — the quick way to poke at one scene inside a big file.</li>
+<li><kbd>Ctrl/Cmd</kbd>+<kbd>/</kbd> comments or uncomments the selection.</li>
+<li>Completion knows the FlexDMD API: type <code>FlexDMD.</code> or a dot after an actor, and in an enum position
+(<code>.Alignment =</code>, <code>.Scaling =</code>, <code>.RenderMode =</code>, <code>.Ease =</code>, or the third argument of
+<code>SetAlignedPosition</code>) it offers the named constants.</li>
+<li>A bare enum number is labelled with what it means; click the label to write the constant instead.</li>
+<li>Above a few thousand lines, auto-run switches itself off — use Run.</li>
+</ul>
+
 <h3>Preview</h3>
 <ul>
-<li><b>Pause / Step / Restart / Speed</b> control the simulated clock (actions and videos follow it).</li>
-<li>Click an actor to select it; drag to move, use the handles to resize. The literals in the script (<code>SetBounds</code>, <code>SetPosition</code>, <code>SetAlignedPosition</code>, <code>SetSize</code>, <code>X = …</code>) update live and are highlighted in the editor. Values that are computed (variables, expressions) are shown read-only.</li>
-<li>Arrow keys nudge the selection (Shift = 10 px). <kbd>Space</kbd> pauses. <kbd>Esc</kbd> deselects. <kbd>Ctrl/Cmd+Enter</kbd> runs.</li>
-<li><b>Subs</b> tab: every Sub/Function in your script becomes a button so you can fire game events (jackpot, ball lost…) and watch the animation.</li>
-<li><b>Sound</b>: pick an audio file from the project folder; it restarts with the script and follows pause/speed, to line up animations with a soundtrack.</li>
+<li><b>Pause / Step / Restart / Speed</b> control the simulated clock (actions, videos and the per-frame Sub follow it).</li>
+<li>Click an actor to select it; drag to move, use the handles to resize. The literals in the script
+(<code>SetBounds</code>, <code>SetPosition</code>, <code>SetAlignedPosition</code>, <code>SetSize</code>, <code>X = …</code>) update live and are
+highlighted. Values that are computed are shown read-only. With several files loaded, only literals in the file you are editing can be dragged.</li>
+<li>Arrow keys nudge the selection (Shift = 10 px). <kbd>Space</kbd> pauses. <kbd>Esc</kbd> deselects.</li>
+<li><b>Subs</b> lists every Sub and Function in the script as a button, so you can fire game events and watch the animation.</li>
+<li><b>Sound</b>: pick an audio file from the project folder; it restarts with the script and follows pause and speed, to line animations
+up with a soundtrack.</li>
 </ul>
-<h3>Render modes</h3>
-<p><code>FlexDMD.RenderMode</code> 0 = 4 shades, 1 = 16 shades (default), 2 = RGB; gray modes are tinted with <code>FlexDMD.Color</code>. Segment display modes are not previewed.</p>
+
+<h3>Assets</h3>
+<p>Click <b>Open folder</b> and pick the folder holding your PNG/JPG/GIF/MP4 and <code>.fnt</code> files. Script paths resolve against it,
+honouring <code>FlexDMD.ProjectFolder</code>. Image options work as in FlexDMD: <code>image.png&amp;dmd=2</code>, <code>&amp;add</code>,
+<code>&amp;region=x,y,w,h</code>, <code>&amp;pad=l,t,r,b</code>; image sequences with <code>a.png|b.png|c.png</code>.
+A file that is not there is replaced by a placeholder and reported in the Log, so a table whose artwork you do not have still previews.
+VPX-embedded resources (<code>VPX.name</code>) and WMV/AVI are not supported in the browser.</p>
+
 <h3>Fidelity notes</h3>
-<p>The engine is a line-by-line port of the C# actors (also the reference for the C++ port in Visual Pinball standalone/BGFX). Known differences: GIF frame delays of 0 are clamped to 10 ms; video timing follows the browser's video element rather than frame stepping.</p>
+<p>The engine is a line-by-line port of the C# actors, which the C++ port in Visual Pinball standalone also follows, and its quirks are
+reproduced on purpose. The one that bites most: a counted <code>ActionFactory.Blink</code> leaves its actor hidden when it ends and never
+resets its counter, so inside a <code>Repeat</code> the actor barely appears after the first pass. Build blinks from
+<code>Wait</code>/<code>Show</code> inside a <code>Repeat</code> instead. GIF frame delays of 0 are clamped to 10 ms, and video timing follows
+the browser rather than the engine's frame stepping.</p>
 </div>`;
 }
 

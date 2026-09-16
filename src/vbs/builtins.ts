@@ -1,3 +1,4 @@
+import { Ghost } from './ghost';
 import { formatNumber, isNumericString, roundHalfEven, toBool, toNumber, toStr, typeName, VbArray, VbNull, VbNullType, VbsRuntimeError, type VbValue } from './values';
 
 export type Builtin = (args: VbValue[]) => VbValue;
@@ -8,6 +9,9 @@ export interface BuiltinHost {
   err: { number: number; description: string };
   typeNameOf: (v: VbValue) => string;
   callValue: (v: VbValue, args: VbValue[]) => VbValue;
+  getRef: (name: string) => VbValue;
+  evalString: (code: string) => VbValue;
+  executeString: (code: string) => void;
 }
 
 // VBScript packs colors as BGR longs: RGB(r,g,b) = r + g*256 + b*65536
@@ -57,10 +61,12 @@ export function createBuiltins(host: BuiltinHost): Map<string, Builtin> {
   def('GetObject', (a) => host.createObject(str(a, 0)));
   def('MsgBox', (a) => { host.log('MsgBox: ' + str(a, 0)); return 1; });
   def('InputBox', () => '');
-  def('GetRef', (a) => a[0]);
-  def('Eval', (a) => a[0]);
-  def('Execute', () => undefined);
-  def('ExecuteGlobal', () => undefined);
+  // GetRef("Name")(args) is how table frameworks call a Sub whose name they hold as a string
+  def('GetRef', (a) => host.getRef(str(a, 0)));
+  // Tables use Eval to reach an object by a name they built at runtime ("RtxBallShadow" & i)
+  def('Eval', (a) => host.evalString(str(a, 0)));
+  def('Execute', (a) => { host.executeString(str(a, 0)); return undefined; });
+  def('ExecuteGlobal', (a) => { host.executeString(str(a, 0)); return undefined; });
 
   // ---- math ----
   def('Abs', (a) => Math.abs(num(a, 0, 'Abs')));
@@ -117,7 +123,7 @@ export function createBuiltins(host: BuiltinHost): Map<string, Builtin> {
   def('IsEmpty', (a) => a[0] === undefined);
   def('IsNull', (a) => a[0] instanceof VbNullType);
   def('IsNothing', (a) => a[0] === null);
-  def('IsObject', (a) => a[0] === null || (typeof a[0] === 'object' && !(a[0] instanceof VbArray) && !(a[0] instanceof VbNullType)));
+  def('IsObject', (a) => a[0] instanceof Ghost || a[0] === null || (typeof a[0] === 'object' && !(a[0] instanceof VbArray) && !(a[0] instanceof VbNullType)));
   def('IsArray', (a) => a[0] instanceof VbArray);
   def('IsNumeric', (a) => typeof a[0] === 'number' || typeof a[0] === 'boolean' || (typeof a[0] === 'string' && isNumericString(a[0])));
   def('IsDate', () => false);
@@ -134,11 +140,14 @@ export function createBuiltins(host: BuiltinHost): Map<string, Builtin> {
   def('LBound', () => 0);
   def('UBound', (a) => {
     const arr = a[0];
+    // An array that is only a stand-in reads as empty, so "For i = 0 To UBound(x)" simply does not run
+    if (arr instanceof Ghost) return -1;
     if (!(arr instanceof VbArray)) throw new VbsRuntimeError('UBound: argument is not an array', null, 13);
     const dim = optNum(a, 1, 1);
     return arr.dims[dim - 1];
   });
   def('Split', (a) => {
+    if (a[0] instanceof Ghost) return VbArray.fromList([]);
     const s = str(a, 0);
     const delim = a.length > 1 && a[1] !== undefined ? str(a, 1) : ' ';
     const count = optNum(a, 2, -1);

@@ -17,6 +17,9 @@ export const BUILTIN_RESOURCES = [
   'udmd-f7by5.fnt', 'udmd-f7by5.png', 'zx_spectrum-7.fnt', 'zx_spectrum-7.png', 'dmds/black.png',
 ];
 
+/** Stand-in used when a .fnt the script names is not in the opened folder */
+const FALLBACK_FONT = 'udmd-f5by7.fnt';
+
 export type AssetType = 'image' | 'video' | 'gif' | 'font' | 'unknown';
 export type SrcType = 'file' | 'flex' | 'vpx';
 
@@ -65,6 +68,13 @@ export class AssetManager {
   private _bitmaps = new Map<string, HTMLCanvasElement>();
   private _fonts = new Map<string, Font>();
   private _pending = new Set<Promise<void>>();
+  /**
+   * When a file is missing, stand in for it rather than failing the whole script. Previewing a
+   * table whose artwork you do not have is the common case, and seeing the layout with placeholders
+   * beats seeing nothing. Every substitution is logged.
+   */
+  substituteMissing = true;
+  private _warned = new Set<string>();
   onLog: (level: 'info' | 'warn' | 'error', message: string) => void = () => {};
 
   // ---- project folder ----
@@ -90,6 +100,7 @@ export class AssetManager {
   get projectFiles(): ReadonlyMap<string, File> { return this._files; }
 
   private invalidateProjectAssets() {
+    this._warned.clear();
     for (const k of [...this._raw.keys()]) if (k.startsWith('file:')) this._raw.delete(k);
     for (const k of [...this._bitmaps.keys()]) if (!k.startsWith('FlexDMD.Resources.')) this._bitmaps.delete(k);
     for (const k of [...this._fonts.keys()]) if (!k.startsWith('FlexDMD.Resources.')) this._fonts.delete(k);
@@ -251,7 +262,16 @@ export class AssetManager {
     const cached = this._bitmaps.get(src.id);
     if (cached) return cached;
     if (src.assetType !== 'image') throw new AssetLoadError(`'${src.path}' is not an image`);
-    const raw = this.ensureRaw(src, src.path, 'image');
+    let raw: RawEntry;
+    try {
+      raw = this.ensureRaw(src, src.path, 'image');
+    } catch (e) {
+      if (e instanceof AssetPendingError || !this.substituteMissing) throw e;
+      this.warnMissing(src.path, 'image');
+      const ph = placeholderBitmap();
+      this._bitmaps.set(src.id, ph);
+      return ph;
+    }
     let bmp = raw.image!;
     for (const f of src.filters) bmp = f.apply(bmp);
     this._bitmaps.set(src.id, bmp);
@@ -272,7 +292,18 @@ export class AssetManager {
     const cached = this._fonts.get(src.id);
     if (cached) return cached;
     if (src.assetType !== 'font') throw new AssetLoadError(`'${src.path}' is not a bitmap font (.fnt)`);
-    const raw = this.ensureRaw(src, src.path, 'text');
+    let raw: RawEntry;
+    try {
+      raw = this.ensureRaw(src, src.path, 'text');
+    } catch (e) {
+      if (e instanceof AssetPendingError || !this.substituteMissing) throw e;
+      this.warnMissing(src.path, 'font');
+      // A bundled font of a similar size keeps the layout readable while the real one is missing
+      const sub = this.resolveSrc(`FlexDMD.Resources.${FALLBACK_FONT}&tint=${src.id.split('tint=')[1]?.split('&')[0] ?? 'FFFFFFFF'}`);
+      const font = this.getFont(sub);
+      this._fonts.set(src.id, font);
+      return font;
+    }
     let data: BitmapFontData;
     try { data = parseBmFont(raw.text!); } catch (e) { throw new AssetLoadError(`Invalid font '${src.path}': ${e instanceof Error ? e.message : e}`); }
     const pages = data.pages.map((p) => {
@@ -304,6 +335,15 @@ export class AssetManager {
     }
     await this.loadPending();
   }
+
+  private warnMissing(path: string, kind: string) {
+    if (this._warned.has(path)) return;
+    this._warned.add(path);
+    this.onLog('warn', `Missing ${kind} '${path}': using a placeholder. Open the folder that holds it to see the real thing.`);
+  }
+
+  /** Files the script asked for that were not found, in the order they were first missed. */
+  get missing(): string[] { return [...this._warned]; }
 
   listLoaded(): string[] { return [...this._raw.entries()].filter(([, e]) => e.state === 'ready').map(([k]) => k); }
 }
@@ -387,6 +427,16 @@ function additiveFilter(): BitmapFilter {
       return c;
     },
   };
+}
+
+/** A visible stand-in for artwork that is not there, so a missing file reads as missing. */
+function placeholderBitmap(): HTMLCanvasElement {
+  const [c, g] = newCanvas(16, 16);
+  g.fillStyle = '#301030';
+  g.fillRect(0, 0, 16, 16);
+  g.fillStyle = '#a020a0';
+  for (let y = 0; y < 16; y += 8) for (let x = 0; x < 16; x += 8) if (((x + y) / 8) % 2 === 0) g.fillRect(x, y, 8, 8);
+  return c;
 }
 
 // ---- GIF decoding with full frame compositing ----

@@ -167,16 +167,21 @@ class Parser {
     return { kind: 'dim', vars, span: this.spanFrom(span) };
   }
 
-  private parseRedim(): Stmt {
+  private parseRedim(inline = false): Stmt {
     const span = this.next().span;
     const preserve = !!this.accept('kw', 'preserve');
-    const name = this.identName();
-    this.expect('op', '(');
-    const dims: Expr[] = [];
-    do { dims.push(this.parseExpr()); } while (this.accept('op', ','));
-    this.expect('op', ')');
-    this.endStatement();
-    return { kind: 'redim', preserve, name, dims, span: this.spanFrom(span) };
+    // "ReDim a(2), b(3), c(4)" declares several arrays in one statement
+    const decls: { name: string; dims: Expr[] }[] = [];
+    do {
+      const name = this.identName();
+      this.expect('op', '(');
+      const dims: Expr[] = [];
+      do { dims.push(this.parseExpr()); } while (this.accept('op', ','));
+      this.expect('op', ')');
+      decls.push({ name, dims });
+    } while (this.accept('op', ','));
+    if (!inline) this.endStatement();
+    return { kind: 'redim', preserve, decls, span: this.spanFrom(span) };
   }
 
   private parseConst(span: Span, _access: string): Stmt {
@@ -302,6 +307,8 @@ class Parser {
       const body = this.parseInlineStatements();
       let elseBody: Stmt[] | null = null;
       if (this.accept('kw', 'else')) elseBody = this.parseInlineStatements();
+      // "If a Then If b Then c End If End If": the inner If closes itself, leaving the outer one its own End If
+      if (this.isKw('end') && this.isKw('if', 1)) { this.next(); this.next(); }
       return { kind: 'if', branches: [{ cond, body }], elseBody, span: this.spanFrom(span) };
     }
     const isSet = t.type === 'kw' && t.value === 'set';
@@ -311,6 +318,12 @@ class Parser {
       const e = this.parsePostfix();
       if (e.kind === 'call') return { kind: 'call', callee: e.callee, args: e.args, span: this.spanFrom(span) };
       return { kind: 'call', callee: e, args: [], span: this.spanFrom(span) };
+    } else if (t.type === 'kw' && t.value === 'redim') {
+      return this.parseRedim(true);
+    } else if (t.type === 'kw' && t.value === 'erase') {
+      this.next();
+      const name = this.identName();
+      return { kind: 'erase', name, span: this.spanFrom(span) };
     } else if (t.type === 'kw' && t.value === 'dim') {
       this.next();
       const vars: { name: string; dims: Expr[] | null; span: Span }[] = [];

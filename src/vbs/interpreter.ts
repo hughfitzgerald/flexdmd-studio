@@ -2,6 +2,7 @@ import type { CaseTest, ClassDecl, Expr, ProcDecl, Program, Span, Stmt } from '.
 import { parse, VbsSyntaxError } from './parser';
 import { hostCallContext } from './hostcontext';
 import { createBuiltins, type Builtin } from './builtins';
+import { Ghost, GhostRegistry } from './ghost';
 import { formatNumber, isObjectValue, isNumericString, roundHalfEven, toBool, toNumber, toStr, typeName, VbArray, VbNull, VbNullType, VbsRuntimeError, type VbValue } from './values';
 
 export { VbsRuntimeError, VbsSyntaxError };
@@ -17,6 +18,16 @@ export interface HostOptions {
   log?: (message: string) => void;
   // Statement budget to abort runaway loops
   maxStatements?: number;
+  // When supplied, unresolved identifiers become stand-in objects instead of errors
+  ghosts?: GhostRegistry;
+  /**
+   * Report a failing top-level statement and carry on with the next one, instead of stopping.
+   * A whole table script is mostly setup the previewer has no business running — playfield
+   * objects, physics, hardware — and none of it should stop the DMD code further down from
+   * being previewed. Statements inside a Sub still fail normally, so the scene code you are
+   * actually working on is not forgiving.
+   */
+  onTopLevelError?: (error: VbsRuntimeError) => void;
 }
 
 export class ProcRef {
@@ -57,11 +68,15 @@ export class Interpreter {
   private maxStatements: number;
   private log: (m: string) => void;
   private hostKeyCache = new WeakMap<object, Map<string, string>>();
+  readonly ghosts: GhostRegistry | null;
+  private onTopLevelError: ((e: VbsRuntimeError) => void) | null;
   private currentSpan: Span | null = null;
   public abortRequested = false;
 
   constructor(private options: HostOptions = {}) {
     this.maxStatements = options.maxStatements ?? 2_000_000;
+    this.ghosts = options.ghosts ?? null;
+    this.onTopLevelError = options.onTopLevelError ?? null;
     this.log = options.log ?? (() => {});
     this.builtins = createBuiltins({
       log: this.log,
@@ -72,6 +87,23 @@ export class Interpreter {
       err: this.err,
       typeNameOf: (v) => this.typeNameOf(v),
       callValue: (v, args) => this.callValue(v, args),
+      evalString: (code) => {
+        try { return this.evalExpression(code); }
+        catch (e) {
+          if (this.ghosts?.enabled) return this.ghosts.touch(`Eval("${code}")`);
+          throw e;
+        }
+      },
+      executeString: (code) => {
+        try { this.runFragment(code); }
+        catch (e) { if (!this.ghosts?.enabled) throw e; }
+      },
+      getRef: (name) => {
+        const ref = this.getProcRef(name);
+        if (ref) return ref;
+        if (this.ghosts?.enabled) return this.ghosts.touch(`GetRef("${name}")`);
+        throw new VbsRuntimeError(`GetRef: Sub or Function not defined: '${name}'`, null, 35);
+      },
     });
     for (const [k, v] of Object.entries(options.globals ?? {})) this.globalScope.vars.set(k.toLowerCase(), v);
   }
@@ -87,7 +119,30 @@ export class Interpreter {
     for (const c of this.program.classes) this.classes.set(c.name, c);
     this.statementCount = 0;
     this.abortRequested = false;
-    this.execBlock(this.program.body, this.globalScope);
+    if (!this.onTopLevelError) { this.execBlock(this.program.body, this.globalScope); return; }
+    for (const stmt of this.program.body) {
+      try {
+        this.execStmt(stmt, this.globalScope);
+      } catch (e) {
+        // The budget and an explicit abort are about the run as a whole, not about one statement
+        const re = this.toRuntimeError(e, stmt.span);
+        if (re.number === 1000 || re.number === 1001) throw re;
+        this.onTopLevelError(re);
+      }
+    }
+  }
+
+  /**
+   * Executes extra statements in the global scope of a script that has already run, keeping every
+   * variable and procedure it defined. Procedures declared in the fragment are added too.
+   */
+  runFragment(source: string) {
+    const prog = parse(source);
+    for (const p of prog.procs) this.procs.set(p.name, p);
+    for (const c of prog.classes) this.classes.set(c.name, c);
+    this.statementCount = 0;
+    this.abortRequested = false;
+    this.execBlock(prog.body, this.globalScope);
   }
 
   /** Lists user-defined procedures (Subs/Functions) so the UI can offer to invoke them. */
@@ -161,14 +216,15 @@ export class Interpreter {
           else if (!scope.vars.has(v.name)) scope.vars.set(v.name, undefined);
         }
         return;
-      case 'redim': {
-        const target = scope.lookup(s.name) ?? scope;
-        const existing = target.vars.get(s.name);
-        const dims = s.dims.map((d) => toInt(this.evalExpr(d, scope)));
-        if (existing instanceof VbArray) existing.redim(dims, s.preserve);
-        else target.vars.set(s.name, new VbArray(dims, true));
+      case 'redim':
+        for (const d of s.decls) {
+          const target = scope.lookup(d.name) ?? scope;
+          const existing = target.vars.get(d.name);
+          const dims = d.dims.map((x) => toInt(this.evalExpr(x, scope)));
+          if (existing instanceof VbArray) existing.redim(dims, s.preserve);
+          else target.vars.set(d.name, new VbArray(dims, true));
+        }
         return;
-      }
       case 'const': scope.vars.set(s.name, this.evalExpr(s.value, scope)); return;
       case 'constlist': for (const d of s.decls) scope.vars.set(d.name, this.evalExpr(d.value, scope)); return;
       case 'assign': this.assign(s.target, this.evalExpr(s.value, scope), scope, s.value); return;
@@ -273,6 +329,7 @@ export class Interpreter {
   }
 
   private iterate(coll: VbValue, span: Span): Iterable<VbValue> {
+    if (coll instanceof Ghost) return [];
     if (coll instanceof VbArray) return coll.toList();
     if (Array.isArray(coll)) return coll;
     if (coll && typeof coll === 'object' && Symbol.iterator in (coll as object)) return coll as Iterable<VbValue>;
@@ -428,6 +485,8 @@ export class Interpreter {
 
   compare(op: string, l: VbValue, r: VbValue): boolean {
     let cmp: number;
+    if (l instanceof Ghost) l = undefined;
+    if (r instanceof Ghost) r = undefined;
     if (l instanceof VbNullType || r instanceof VbNullType) return false;
     if (typeof l === 'string' && typeof r === 'string') cmp = l < r ? -1 : l > r ? 1 : 0;
     else if (typeof l === 'string' || typeof r === 'string') {
@@ -492,6 +551,7 @@ export class Interpreter {
     if (proc) return this.invokeProc(proc, args, null, argExprs);
     const builtin = this.builtins.get(name);
     if (builtin) return this.callBuiltin(builtin, name, args, span);
+    if (this.ghosts?.enabled) return this.ghosts.touch(name + (hasParens || args.length > 0 ? '()' : ''));
     if (hasParens || args.length > 0) throw new VbsRuntimeError(`Sub or Function not defined: '${name}'`, span, 35);
     // Undeclared variable read: VBScript returns Empty
     return undefined;
@@ -519,6 +579,7 @@ export class Interpreter {
     if (base instanceof VbArray) return base.get(args.map((a) => toInt(a)));
     if (base instanceof ProcRef) return this.invokeProc(base.decl, args, base.self, e.args);
     if (base && typeof base === 'object') return this.hostIndex(base, args, e.span);
+    if (typeof base === 'string') return this.callValue(base, args);
     throw new VbsRuntimeError('Value cannot be called or indexed', e.span, 13);
   }
 
@@ -527,6 +588,7 @@ export class Interpreter {
     if (callee.kind === 'ident') {
       // A statement like "x" where x is a variable holding a procedure reference, or a Sub call
       const s = scope.lookup(callee.name);
+      if (s && s.vars.get(callee.name) instanceof Ghost) return;
       if (s && !(s.vars.get(callee.name) instanceof ProcRef)) {
         if (args.length === 0) return; // evaluating a bare variable as a statement is a no-op
         throw new VbsRuntimeError(`'${callee.name}' is a variable, not a Sub`, span, 13);
@@ -539,10 +601,19 @@ export class Interpreter {
       this.getMember(obj, callee.name, args, scope, span, argExprs);
       return;
     }
-    this.evalExpr(callee, scope);
+    // A computed callee, as in the GetRef("Name")(args) dispatch table frameworks use: the
+    // arguments belong to the value the callee evaluates to, so they must be applied to it.
+    const base = this.evalExpr(callee, scope);
+    if (args.length === 0) return;
+    if (base instanceof ProcRef) { this.invokeProc(base.decl, args, base.self, argExprs); return; }
+    if (typeof base === 'string') { this.callValue(base, args); return; }
+    if (base instanceof VbArray) return;
+    if (base && typeof base === 'object') { this.hostIndex(base as object, args, span); return; }
+    throw new VbsRuntimeError('Value cannot be called', span, 13);
   }
 
   private hostIndex(obj: object, args: VbValue[], span: Span): VbValue {
+    if (obj instanceof Ghost) return this.ghosts!.member(obj, 'item', true);
     if (Array.isArray(obj)) return obj[toInt(args[0])];
     const fn = (obj as { vbIndex?: (args: VbValue[]) => VbValue }).vbIndex;
     if (typeof fn === 'function') return fn.call(obj, args);
@@ -550,6 +621,7 @@ export class Interpreter {
   }
 
   private getMember(obj: VbValue, name: string, args: VbValue[], scope: Scope, span: Span, argExprs: (Expr | null)[] = []): VbValue {
+    if (obj instanceof Ghost) return this.ghosts!.member(obj, name, args.length > 0);
     if (obj === null || obj === undefined) throw new VbsRuntimeError(`Object required: cannot read '${name}' of ${obj === null ? 'Nothing' : 'Empty'}`, span, 424);
     if (obj instanceof ClassInstance) return this.classGet(obj, name, args, scope, span, argExprs);
     if (obj instanceof VbArray || typeof obj !== 'object') throw new VbsRuntimeError(`Object required: '${typeName(obj)}' has no member '${name}'`, span, 424);
@@ -562,7 +634,7 @@ export class Interpreter {
       try {
         return this.wrapHostResult((v as (...a: VbValue[]) => unknown).apply(obj, args), span);
       } catch (e) {
-        throw this.hostError(e, name, span);
+        throw this.hostError(e, name, span, args);
       } finally {
         hostCallContext.argSpans = [];
       }
@@ -576,6 +648,7 @@ export class Interpreter {
   }
 
   private setMember(obj: VbValue, name: string, args: VbValue[], value: VbValue, scope: Scope, span: Span, valueExpr: Expr | null) {
+    if (obj instanceof Ghost) { this.ghosts!.member(obj, name, false); return; }
     if (obj === null || obj === undefined) throw new VbsRuntimeError(`Object required: cannot set '${name}' of ${obj === null ? 'Nothing' : 'Empty'}`, span, 424);
     if (obj instanceof ClassInstance) { this.classSet(obj, name, args, value, scope); return; }
     if (obj instanceof VbArray || typeof obj !== 'object') throw new VbsRuntimeError(`Object required: '${typeName(obj)}' has no member '${name}'`, span, 424);
@@ -586,15 +659,24 @@ export class Interpreter {
     try {
       (obj as Record<string, unknown>)[key] = value;
     } catch (e) {
-      throw this.hostError(e, name, span);
+      throw this.hostError(e, name, span, [value]);
     } finally {
       hostCallContext.argSpans = [];
     }
   }
 
-  private hostError(e: unknown, name: string, span: Span): VbsRuntimeError {
+  private hostError(e: unknown, name: string, span: Span, values: VbValue[] = []): VbsRuntimeError {
     if (e instanceof VbsRuntimeError) { if (!e.span) e.span = span; return e; }
-    const re = new VbsRuntimeError(`${name}: ${e instanceof Error ? e.message : String(e)}`, span, 500);
+    let msg = `${name}: ${e instanceof Error ? e.message : String(e)}`;
+    // The usual cause is a variable declared in a file that is not loaded, which reads as a stand-in
+    const ghost = values.find((v) => v instanceof Ghost) as Ghost | undefined;
+    if (ghost) {
+      const bare = ghost.path.replace(/\(\)$/, '');
+      msg += ` — '${bare}' has no value here.` + (/^\w+$/.test(bare)
+        ? ` It is assigned inside a Sub or declared in a file that is not loaded; add "Dim ${bare}" at the top level, or include that file.`
+        : '');
+    }
+    const re = new VbsRuntimeError(msg, span, 500);
     if (e instanceof Error && e.stack) re.stack = e.stack;
     return re;
   }
@@ -707,6 +789,7 @@ export class Interpreter {
   }
 
   private typeNameOf(v: VbValue): string {
+    if (v instanceof Ghost) return 'Object';
     if (v instanceof ClassInstance) return v.decl.name;
     return typeName(v);
   }
@@ -722,4 +805,5 @@ export function literalSpan(e: Expr | null): Span | null {
   return null;
 }
 
+export { Ghost, GhostRegistry };
 export { formatNumber, toBool, toNumber, toStr, typeName, VbArray, VbNull, VbNullType, type VbValue };

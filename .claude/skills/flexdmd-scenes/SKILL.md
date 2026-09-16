@@ -31,6 +31,9 @@ real engine. The reference for everything here is FlexDMD's own C# source ([acto
   uses the *current* size, so set text/size first, then position.
 - **The renderer runs in its own thread** (in the COM version). Wrap every stage modification made from table
   code (timers, hit events) in `FlexDMD.LockRenderThread` / `FlexDMD.UnlockRenderThread`.
+- **Enum constants.** Tables declare `FlexDMD_Align_Center`, `FlexDMD_RenderMode_DMD_RGB` and friends in a `Const`
+  block rather than passing bare numbers. Prefer those names in code you write, and include the block (or say
+  where it comes from) so the script stays self-contained; the numbers are in the cheat sheet below.
 - **VBScript call syntax.** A Sub call takes no parentheses: `scene.AddActor lbl`, `lbl.SetAlignedPosition 64, 16, 4`.
   A function call in an expression uses them: `Set lbl = FlexDMD.NewLabel("Score", font, "0")`. `Set` is
   required for object assignment. Enums are passed as integers (see the cheat sheet below).
@@ -51,10 +54,11 @@ real engine. The reference for everything here is FlexDMD's own C# source ([acto
    the studio once, and a Chromium; set `CHROMIUM_PATH` if Playwright's is not installed):
    `node scripts/check-script.mjs scene.vbs --call DMD_Init --call "Jackpot(1500000)" --shots 0.5,2.5`
    runs the script headlessly, calls the listed Subs in order, steps the simulated clock, prints errors and the
-   actor tree (absolute bounds, visibility, pending actions) and saves screenshots at the requested times. The
-   studio pre-creates `FlexDMD` (and a `Table1` stub with `Filename`); other table objects, timers and
-   `PlaySound` do not exist there, so keep them out of the DMD Subs or behind `If Not FlexDMD Is Nothing`.
-   Fix everything the checker reports; a script that errors in the studio errors in VPX too.
+   actor tree (absolute bounds, visibility, pending actions) and saves screenshots at the requested times.
+   `--each-frame "Tick()"` drives a per-frame Sub the way the table's DMD timer would, with `FlexFrame` counting
+   up. Table objects, lights, timers and `PlaySound` are stood in for rather than defined, so a whole table script
+   runs and the names that were faked are listed; pass `--strict` to have them reported as errors instead while
+   checking your own scene code. Fix everything the checker reports; a script that errors there errors in VPX too.
 5. **Integrate.** For a table, the DMD code lives in the table script: a `DMD_Init` Sub called from
    `Table1_Init`, scene Subs called from game logic, and `FlexDMD.Run = False` in `Table1_Exit`. Guard every
    FlexDMD call with `If Not FlexDMD Is Nothing Then` so the table still runs where FlexDMD is not installed.

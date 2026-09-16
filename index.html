@@ -29,6 +29,14 @@
         <span class="spacer"></span>
         <span id="status" class="status"></span>
       </header>
+      <div id="runbar" title="Frameworks build a scene in one Sub and update it in another. Name them here and the studio calls them the way a table would.">
+        <label>On run <input type="text" id="in-onrun" placeholder="DMD_Init" spellcheck="false" /></label>
+        <label>Each frame <input type="text" id="in-perframe" placeholder="DmdTick_Score(Nothing)" spellcheck="false" /></label>
+        <label title="Stand in for table objects, lights, timers and framework calls the previewer does not have, instead of failing on them"><input type="checkbox" id="chk-stub" checked /> Stub unknowns</label>
+        <button id="btn-consts" title="Paste the FlexDMD_Align_* / FlexDMD_RenderMode_* Const block so the script stays portable to VPX">Insert constants</button>
+        <span class="spacer"></span>
+        <span id="file-label" class="muted"></span>
+      </div>
       <main id="main">
         <section id="editor-pane"><div id="editor"></div></section>
         <div id="splitter" title="Drag to resize"></div>
@@ -41,6 +49,8 @@
             <nav>
               <button data-tab="inspector" class="active">Inspector</button>
               <button data-tab="subs">Subs</button>
+              <button data-tab="files">Files</button>
+              <button data-tab="stubs">Stubs <span id="stub-badge" hidden></span></button>
               <button data-tab="assets">Assets</button>
               <button data-tab="log">Log <span id="log-badge" hidden></span></button>
               <button data-tab="help">Help</button>
@@ -50,6 +60,8 @@
               <div id="actor-props"></div>
             </div>
             <div class="tab" id="tab-subs"></div>
+            <div class="tab" id="tab-files"></div>
+            <div class="tab" id="tab-stubs"></div>
             <div class="tab" id="tab-assets"></div>
             <div class="tab" id="tab-log"></div>
             <div class="tab" id="tab-help"></div>

@@ -1,24 +1,43 @@
 // Runs scripts against the FlexDMD engine and drives the preview clock.
-import { Interpreter, VbsRuntimeError, VbsSyntaxError, VbArray, type VbValue } from '../vbs/interpreter';
+import { Interpreter, VbsRuntimeError, VbsSyntaxError, VbArray, GhostRegistry, type VbValue } from '../vbs/interpreter';
 import type { Span } from '../vbs/ast';
 import { FlexDMD, type LogLevel } from '../flex/flexdmd';
+import { constantGlobals } from '../flex/constants';
 import { AssetPendingError } from '../flex/assets';
 import type { ProcDecl } from '../vbs/ast';
 
 export interface ScriptError { message: string; line: number | null; span: Span | null; }
+
+/** Top-level statements that failed and were skipped, when the runner is standing in for a table. */
+export interface SkippedStatement { message: string; line: number | null; }
+
+/** Subs the studio calls for you: one after a run, one on every frame. */
+export interface EntryPoints {
+  /** Called once after the script runs, e.g. "DMD_Init" or "Table1_Init" */
+  onRun: string;
+  /** Called before every frame, e.g. "DmdTick_Score(Nothing)" — this is the table's DMD timer */
+  perFrame: string;
+}
 
 export interface RunnerEvents {
   onLog: (level: LogLevel, message: string, span?: Span | null) => void;
   onFrame: (output: ImageData) => void;
   onRunFinished: (error: ScriptError | null, procs: ProcDecl[]) => void;
   onPlayStateChange: (playing: boolean) => void;
+  /** Reports an error raised by the per-frame Sub; ticking stops until the next run */
+  onTickError: (error: ScriptError) => void;
 }
 
 const MAX_RELOADS = 12;
 
 export class Runner {
   readonly flex = new FlexDMD();
+  readonly ghosts = new GhostRegistry();
   interp: Interpreter | null = null;
+  entryPoints: EntryPoints = { onRun: '', perFrame: '' };
+  /** Frame counter exposed to scripts as FlexFrame, the way table DMD timers count frames */
+  flexFrame = 0;
+  private _tickBroken = false;
   /** Source of the last successful run (bindings refer to it) */
   lastRunSource: string | null = null;
   private _playing = true;
@@ -33,6 +52,8 @@ export class Runner {
   private _fpsTime = 0;
   /** Set when the preview should redraw although time is not advancing (e.g. while dragging an actor) */
   dirty = false;
+  /** Table setup the previewer could not run; the DMD code after it still ran */
+  skipped: SkippedStatement[] = [];
 
   constructor(private ev: RunnerEvents) {
     this.flex.onLog = (l, m) => ev.onLog(l, m);
@@ -65,6 +86,7 @@ export class Runner {
     if (this._running) return; // a script run is in progress (waiting for assets)
     if (this._playing) {
       try {
+        this.runPerFrameSub();
         this.flex.step(dt * this.speed);
       } catch (e) {
         this.playing = false;
@@ -81,10 +103,33 @@ export class Runner {
     this.ev.onFrame(this.flex.output());
   }
 
+  /**
+   * Runs the script's per-frame Sub, standing in for the table's DMD timer. Errors stop the
+   * ticking rather than repeating sixty times a second; the next run clears that.
+   */
+  private runPerFrameSub() {
+    const call = this.entryPoints.perFrame.trim();
+    if (!call || !this.interp || this._tickBroken) return;
+    this.flexFrame++;
+    this.interp.setGlobal('FlexFrame', this.flexFrame);
+    const err = this.callParsed(call);
+    if (err) {
+      this._tickBroken = true;
+      this.ev.onTickError(err);
+    }
+  }
+
+  /** Runs a "Name" or "Name(arg, arg)" call written in an entry-point field. */
+  callParsed(call: string): ScriptError | null {
+    const m = call.trim().match(/^(\w+)\s*(?:\((.*)\))?\s*$/);
+    if (!m) return { message: `Not a Sub call: ${call}`, line: null, span: null };
+    return this.callSub(m[1], m[2] ?? '');
+  }
+
   /** Advances exactly one frame while paused */
   stepOnce() {
     this.playing = false;
-    try { this.flex.step(1 / 60); } catch (e) { this.ev.onLog('error', `Render loop error: ${e instanceof Error ? e.message : e}`); }
+    try { this.runPerFrameSub(); this.flex.step(1 / 60); } catch (e) { this.ev.onLog('error', `Render loop error: ${e instanceof Error ? e.message : e}`); }
     this.ev.onFrame(this.flex.output());
   }
 
@@ -102,11 +147,23 @@ export class Runner {
         flex.resetToDefaults();
         flex.GameName = 'FlexDMD Studio';
         flex.Run = true;
+        this.ghosts.clear();
+        this.skipped = [];
+        this.flexFrame = 0;
+        this._tickBroken = false;
         const interp = new Interpreter({
-          // Table1 is a stub so table-style init code (Table1.Filename & ".vpx") runs in the preview
-          globals: { FlexDMD: flex, Table1: { Filename: 'Table1', Name: 'Table1' } },
+          // FlexFrame is the frame counter table DMD timers count on; the studio advances it.
+          // Everything else a table script reaches for (Table1, lights, timers) is stood in for.
+          globals: { ...constantGlobals(), FlexDMD: flex, FlexFrame: 0 },
+          ghosts: this.ghosts,
+          // Only while standing in for a table: a broken line of playfield setup should not stop
+          // the DMD code below it from being previewed.
+          onTopLevelError: this.ghosts.enabled
+            ? (e) => { if (this.skipped.length < 200) this.skipped.push({ message: e.message, line: e.span?.line ?? null }); }
+            : undefined,
           createObject: (progId) => {
             if (progId.toLowerCase() === 'flexdmd.flexdmd') return flex;
+            if (this.ghosts.enabled) return this.ghosts.touch(`CreateObject("${progId}")`);
             throw new VbsRuntimeError(`CreateObject("${progId}") is not available in the previewer`, null, 429);
           },
           log: (m) => this.ev.onLog('info', m),
@@ -114,6 +171,11 @@ export class Runner {
         this.interp = interp;
         try {
           interp.run(source);
+          const init = this.entryPoints.onRun.trim();
+          if (init) {
+            const e = this.callParsed(init);
+            if (e) { error = e; break; }
+          }
           error = null;
           break;
         } catch (e) {
@@ -139,6 +201,22 @@ export class Runner {
       }
     }
     return error;
+  }
+
+  /**
+   * Runs a fragment against the loaded script's state, leaving the stage as it is. This is what
+   * "run the selection" does, so a single scene inside a large file can be poked at in isolation.
+   */
+  runSnippet(source: string): ScriptError | null {
+    if (!this.interp) return { message: 'No script is loaded', line: null, span: null };
+    try {
+      this.interp.runFragment(source);
+      this.dirty = true;
+      return null;
+    } catch (e) {
+      if (this.flex.AssetManager.hasPending) void this.flex.AssetManager.loadPending();
+      return toScriptError(e);
+    }
   }
 
   /** Invokes a Sub/Function of the current script with VBScript-literal arguments ("1, "text", True") */

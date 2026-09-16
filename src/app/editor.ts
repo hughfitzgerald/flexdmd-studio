@@ -1,9 +1,8 @@
 import { EditorView, basicSetup } from 'codemirror';
 import { EditorState, StateEffect, StateField, type Extension } from '@codemirror/state';
 import { Decoration, keymap, type DecorationSet } from '@codemirror/view';
-import { StreamLanguage } from '@codemirror/language';
-import { indentWithTab } from '@codemirror/commands';
-import { vbScript } from '@codemirror/legacy-modes/mode/vbscript';
+import { indentWithTab, toggleComment } from '@codemirror/commands';
+import { vbsLanguage, enumLabels } from './vbslang';
 import type { Span } from '../vbs/ast';
 
 const setErrorLine = StateEffect.define<number | null>();
@@ -53,12 +52,23 @@ const darkTheme = EditorView.theme({
   '.tok-string': { color: '#c3e88d' },
   '.tok-number': { color: '#f78c6c' },
   '.tok-comment': { color: '#6b7280', fontStyle: 'italic' },
+  '.cm-enum-label': { color: '#7dd3fc', background: 'rgba(125,211,252,0.12)', borderRadius: '3px', padding: '0 4px', marginLeft: '4px', fontSize: '11px', cursor: 'pointer' },
   '.tok-variableName': { color: '#d8dbe2' },
 }, { dark: true });
 
 export interface ScriptEditorOptions {
   onChange: (text: string) => void;
   onRunRequest: () => void;
+  /** Ctrl/Cmd+Shift+Enter: run just the selected lines on top of what is already loaded */
+  onRunSelection?: (text: string) => void;
+}
+
+/** The selected text, expanded to whole lines; the current line when nothing is selected. */
+function selectedLines(view: EditorView): string {
+  const { from, to } = view.state.selection.main;
+  const start = view.state.doc.lineAt(from).from;
+  const end = view.state.doc.lineAt(to).to;
+  return view.state.doc.sliceString(start, end);
 }
 
 export class ScriptEditor {
@@ -68,8 +78,14 @@ export class ScriptEditor {
   constructor(parent: HTMLElement, initial: string, private opts: ScriptEditorOptions) {
     const extensions: Extension[] = [
       basicSetup,
-      keymap.of([{ key: 'Mod-Enter', run: () => { opts.onRunRequest(); return true; } }, indentWithTab]),
-      StreamLanguage.define(vbScript),
+      keymap.of([
+        { key: 'Mod-Enter', run: () => { opts.onRunRequest(); return true; } },
+        { key: 'Mod-Shift-Enter', run: (v) => { opts.onRunSelection?.(selectedLines(v)); return true; } },
+        { key: 'Mod-/', run: toggleComment },
+        indentWithTab,
+      ]),
+      vbsLanguage,
+      enumLabels,
       darkTheme,
       errorLineField,
       boundField,
@@ -82,6 +98,11 @@ export class ScriptEditor {
 
   setText(text: string) {
     this.view.dispatch({ changes: { from: 0, to: this.view.state.doc.length, insert: text } });
+  }
+
+  /** Puts text at the very top of the document (used for the constants block). */
+  insertAtTop(text: string) {
+    this.view.dispatch({ changes: { from: 0, insert: text } });
   }
 
   setErrorLine(line: number | null) { this.view.dispatch({ effects: setErrorLine.of(line) }); }

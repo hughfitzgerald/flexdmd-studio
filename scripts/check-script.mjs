@@ -4,6 +4,8 @@
 // tree, optionally calls a Sub, and saves screenshots at given times.
 //
 //   node scripts/check-script.mjs scene.vbs [--call "Name(args)"]... [--sub Name] [--args "1, \"x\""] [--shots 0.5,2] [--out dir]
+//                                            [--each-frame "Tick()"]  (run this Sub before every frame, as a table's DMD timer does)
+//                                            [--strict]               (report unknown names as errors instead of standing in for them)
 //                                            [--url http://host/]   (skip the built-in preview server)
 //                                            [--json result.json]   (machine readable result)
 //
@@ -30,7 +32,7 @@ const shots = (opt('--shots', '1') || '').split(',').map(Number).filter((n) => !
 const out = resolve(opt('--out', 'check-out'));
 mkdirSync(out, { recursive: true });
 const jsonPath = opt('--json');
-const result = { file, error: null, subError: null, logs: [], snapshots: [] };
+const result = { file, error: null, subError: null, logs: [], stubbed: [], skipped: [], snapshots: [] };
 
 let url = opt('--url');
 let server = null;
@@ -72,11 +74,13 @@ try {
   await page.goto(url);
   await page.waitForFunction(() => window.studio && window.studio.runner.lastRunSource !== null, null, { timeout: 20000 });
   // Pause the clock and switch off auto-run so nothing re-runs the script behind our back, then run it once
-  await page.evaluate(() => {
+  await page.evaluate(([perFrame, strict]) => {
     window.studio.runner.playing = false;
     const auto = document.querySelector('#chk-autorun');
     if (auto && auto.checked) auto.click();
-  });
+    window.studio.runner.entryPoints = { onRun: '', perFrame };
+    window.studio.runner.ghosts.enabled = !strict;
+  }, [opt('--each-frame', '') ?? '', args.includes('--strict')]);
   const err = await page.evaluate(async (src) => {
     window.studio.editor.setText(src);
     return await window.studio.runner.run(src);
@@ -91,6 +95,10 @@ try {
   const logs = await page.evaluate(() => Array.from(document.querySelectorAll('#tab-log .log-line')).map((e) => e.textContent));
   result.logs = logs;
   for (const l of logs) console.log('  log:', l);
+  result.stubbed = await page.evaluate(() => window.studio.runner.ghosts.list().map((g) => g.path));
+  result.skipped = await page.evaluate(() => window.studio.runner.skipped);
+  if (result.stubbed.length) console.log(`stood in for ${result.stubbed.length} unknown name(s): ${result.stubbed.slice(0, 8).join(', ')}${result.stubbed.length > 8 ? ' …' : ''}`);
+  for (const sk of result.skipped) console.log(`  skipped line ${sk.line}: ${sk.message}`);
   for (const c of calls) {
     if (err || result.subError) break;
     const e3 = await page.evaluate(([name, a]) => window.studio.runner.callSub(name, a), [c.name, c.args]);
@@ -107,7 +115,11 @@ try {
   let t = 0;
   for (const target of shots.sort((a, b) => a - b)) {
     const frames = Math.max(0, Math.round((target - t) * 60));
-    await page.evaluate((n) => { for (let i = 0; i < n; i++) window.studio.runner.flex.step(1 / 60); window.studio.runner.dirty = true; }, frames);
+    await page.evaluate((n) => {
+      const r = window.studio.runner;
+      for (let i = 0; i < n; i++) { r.stepOnce(); }
+      r.dirty = true;
+    }, frames);
     t = target;
     await page.waitForTimeout(50);
     const path = resolve(out, `t${target.toFixed(2)}s.png`);

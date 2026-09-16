@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { Interpreter, VbArray } from '../src/vbs/interpreter';
+import { GhostRegistry, Interpreter, VbArray } from '../src/vbs/interpreter';
 
 function run(src: string, globals: Record<string, object> = {}) {
   const logs: string[] = [];
@@ -131,6 +131,76 @@ describe('VBScript interpreter', () => {
   it('supports multiple constants in one Const statement', () => {
     const { it } = run('Const A = 1, B = 2, C = A + B\nx = C * 10');
     expect(it.getGlobal('x')).toBe(30);
+  });
+
+  it('parses the single-line forms real table scripts use', () => {
+    // All three come from the shared VPW ball-physics block that ships in most tables.
+    const { it } = run(`
+      Dim threshold, hit
+      threshold = 0
+      Sub Physics(b)
+        If threshold Then If b < threshold Then Exit Sub End If End If
+        hit = hit + 1
+      End Sub
+      Dim ballvel()
+      Dim highestID : highestID = 3
+      If UBound(ballvel) < highestID Then ReDim ballvel(highestID)
+      ReDim a(2), b(3), c(4)
+      Physics 5
+      Physics 5
+    `);
+    expect(it.getGlobal('hit')).toBe(2);
+    expect((it.getGlobal('ballvel') as VbArray).dims).toEqual([3]);
+    expect((it.getGlobal('c') as VbArray).dims).toEqual([4]);
+  });
+
+  it('runs the guarded branch of a nested single-line If', () => {
+    const { it } = run('Dim n : n = 0\nSub T(a, b)\nIf a Then If b < 2 Then Exit Sub End If End If\nn = n + 1\nEnd Sub\nT 1, 1\nT 1, 5\nT 0, 0');
+    expect(it.getGlobal('n')).toBe(2);
+  });
+
+  it('calls a Sub through GetRef, the way table frameworks dispatch by name', () => {
+    const { it } = run(`
+      Dim built
+      built = ""
+      Sub BuildA(x) : built = built & "A" & x : End Sub
+      Function Pick(n) : Pick = "Build" & n : End Function
+      GetRef("BuildA")(1)
+      GetRef(Pick("A"))(2)
+      Dim r : Set r = GetRef("BuildA")
+      r 3
+    `);
+    expect(it.getGlobal('built')).toBe('A1A2A3');
+  });
+
+  it('runs a fragment against an already-loaded script, keeping its state', () => {
+    const { it } = run('Dim total\ntotal = 1\nSub Add(n) : total = total + n : End Sub');
+    it.runFragment('Add 5');
+    expect(it.getGlobal('total')).toBe(6);
+    it.runFragment('Sub Twice(n) : Add n : Add n : End Sub\nTwice 2');
+    expect(it.getGlobal('total')).toBe(10);
+    expect(it.hasProc('Twice')).toBe(true);
+  });
+
+  it('stands in for names it does not know, so table code around the DMD still runs', () => {
+    const logs: string[] = [];
+    const ghosts = new GhostRegistry();
+    const interp = new Interpreter({ ghosts, log: (m) => logs.push(m) });
+    interp.run(`
+      Dim ok
+      Table1.ShowDT = True
+      PlaySound "thud", 0, 1
+      Dim n : n = PlayerScore(3) + 1
+      If Not Controller Is Nothing Then ok = "guard ran"
+      Dim s : s = "score: " & GetPlayerState("score")
+      For Each x In SomeCollection : ok = "never" : Next
+      Dim c : c = UBound(MissingArray)
+    `);
+    expect(interp.getGlobal('n')).toBe(1);            // a stand-in counts as 0
+    expect(interp.getGlobal('s')).toBe('score: ');    // and as an empty string
+    expect(interp.getGlobal('ok')).toBe('guard ran'); // "Is Nothing" guards still take the real branch
+    expect(interp.getGlobal('c')).toBe(-1);           // an unknown array is empty, so loops over it do not run
+    expect(ghosts.list().map((g) => g.path)).toContain('playsound()'); // () marks a name used as a call
   });
 
   it('aborts runaway loops', () => {

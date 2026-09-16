@@ -40,7 +40,7 @@ export interface Param {
 
 export type Stmt =
   | { kind: 'dim'; vars: { name: string; dims: Expr[] | null; span: Span }[]; span: Span }
-  | { kind: 'redim'; preserve: boolean; name: string; dims: Expr[]; span: Span }
+  | { kind: 'redim'; preserve: boolean; decls: { name: string; dims: Expr[] }[]; span: Span }
   | { kind: 'const'; name: string; value: Expr; span: Span }
   | { kind: 'constlist'; decls: { name: string; value: Expr }[]; span: Span }
   | { kind: 'assign'; target: Expr; value: Expr; isSet: boolean; span: Span }

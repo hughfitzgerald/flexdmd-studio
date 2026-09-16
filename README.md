@@ -33,9 +33,47 @@ until you have done that.
 
 ## Using it
 
-- **Script pane** (left): a `FlexDMD` object is pre-created with `Run = True`, exactly like the FlexDMDUI design
-  tab. `CreateObject("FlexDMD.FlexDMD")` returns that same object, so table-style initialisation code works too.
-  The script re-runs automatically as you type (toggle *Auto-run*, or press <kbd>Ctrl/Cmd</kbd>+<kbd>Enter</kbd>).
+### Three ways in
+
+- **A scene on its own.** A `FlexDMD` object is pre-created with `Run = True`, exactly like the FlexDMDUI design
+  tab, so you can write scene code straight away. Start from the Samples menu.
+- **A whole table script.** Paste or open one, however large. Everything it reaches for that the previewer is not
+  — the table, lights, timers, sound, the framework it is built on — is stood in for, and any line of setup that
+  still fails is skipped and listed rather than stopping the run. Set **On run** to the table's init Sub (often
+  `Table1_Init`) to build its DMD. A 23,000-line production table loads in well under a second.
+- **Files out of a larger project.** Open the folder and tick the files you want in the **Files** tab. Frameworks
+  usually split the DMD across a config file listing the scenes and a scenes file holding a `Builder` that
+  constructs each scene once and a `Ticker` that updates it every frame, with the glue somewhere you have not got.
+  [`examples/studio-harness.vbs`](examples/studio-harness.vbs) is that glue, small enough to read and edit.
+
+### The run bar
+
+- **On run** — a Sub called once after the script runs, for the table's or framework's init.
+- **Each frame** — a Sub called before every frame, standing in for the table's DMD timer. `FlexFrame` counts up
+  for it, so tickers that key on frame numbers behave as they do in the table. An error here stops the ticking
+  rather than repeating it sixty times a second.
+- **Stub unknowns** — on by default. Turn it off and every unknown name is an error again, which is what you want
+  while debugging your own scene code. The **Stubs** tab lists what was stood in for, and flags names that look
+  like a `Dim` left behind in a file you have not loaded.
+- **Insert constants** — pastes the `FlexDMD_Align_*` / `FlexDMD_RenderMode_*` block that tables carry, so a
+  script written here stays portable. The studio defines those names anyway, block or no block.
+
+### Editing
+
+- <kbd>Ctrl/Cmd</kbd>+<kbd>Enter</kbd> runs; <kbd>Ctrl/Cmd</kbd>+<kbd>Shift</kbd>+<kbd>Enter</kbd> runs just the
+  selected lines on top of what is already loaded, without resetting the stage.
+- <kbd>Ctrl/Cmd</kbd>+<kbd>/</kbd> comments or uncomments the selection.
+- Completion knows the API: type `FlexDMD.` or a dot after an actor, and in an enum position (`.Alignment =`,
+  `.Scaling =`, `.RenderMode =`, `.Ease =`, or the third argument of `SetAlignedPosition`) it offers the named
+  constants.
+- A bare enum number is labelled with what it means; click the label to write the constant instead.
+- Above a few thousand lines auto-run switches itself off, so a large script is not re-run on every keystroke.
+
+### Everything else
+
+- **Script pane** (left): `CreateObject("FlexDMD.FlexDMD")` returns the same pre-created object, so table-style
+  initialisation code works. The script re-runs as you type (toggle *Auto-run*, or press
+  <kbd>Ctrl/Cmd</kbd>+<kbd>Enter</kbd>).
 - **Preview** (right): the DMD frame after render mode processing (`RenderMode` 0/1 = 4/16 shades tinted with
   `FlexDMD.Color`, 2 = RGB), with an optional dot mask. *Pause*, *Step*, *Restart* and *Speed* drive the simulated
   clock that actions, GIFs and image sequences follow.
@@ -43,13 +81,15 @@ until you have done that.
   script that produced its position and size (`SetBounds`, `SetPosition`, `SetAlignedPosition`, `SetSize`,
   `X = 10`...) are rewritten live and highlighted in the editor. Values that come from variables or expressions are
   shown read-only with an explanation in the Inspector. Arrow keys nudge the selection (<kbd>Shift</kbd> = 10 px).
+  With several files loaded, only literals in the file open in the editor can be dragged.
 - **Inspector**: the actor tree with live bounds, the properties of the selected actor and its pending actions.
 - **Subs**: every `Sub`/`Function` in the script becomes a button, with a field for arguments written as VBScript
   literals (`1500000, "PLAYER 1", True`). Use it to fire the game events your table would fire.
 - **Assets**: click *Open folder* (or drop a folder on the page) to load the folder holding your PNG/JPG/BMP/GIF/MP4
   and `.fnt` files. Script paths resolve against it, honouring `FlexDMD.ProjectFolder`. Image options work as in
   FlexDMD: `img.png&dmd=2`, `&add`, `&region=x,y,w,h`, `&pad=l,t,r,b`, and `a.png|b.png|c.png` sequences. The
-  fonts bundled with FlexDMD are available under their usual `FlexDMD.Resources.` names.
+  fonts bundled with FlexDMD are available under their usual `FlexDMD.Resources.` names. A file that is not there
+  is replaced by a placeholder and reported in the Log, so a table whose artwork you do not have still previews.
 - **Sound**: pick an audio file (ogg/mp3/wav) from the project folder; it restarts with the script and follows
   pause and speed, so you can line animations up with a soundtrack even though FlexDMD itself plays no sound.
 
@@ -61,6 +101,9 @@ working with an agent:
 ```sh
 node scripts/check-script.mjs scene.vbs --call DMD_Init --call "Jackpot(1500000)" --shots 0.5,2.5
 ```
+
+`--each-frame "Tick()"` runs a Sub before every frame, as the table's DMD timer does, and `--strict` turns off
+standing in for unknown names so they are reported as errors.
 
 It prints syntax and runtime errors with line numbers, calls the listed Subs in order, steps the simulated clock,
 dumps the actor tree (absolute bounds, visibility, pending actions) and saves screenshots at the requested times.
@@ -88,8 +131,9 @@ engine's frame stepping. GIF frame delays of 0 are clamped to 10 ms.
 The VBScript interpreter covers the language as used in table scripts: `Dim/ReDim/Const`, `Set`, `Sub/Function`
 with `Exit`, `If/ElseIf/Else`, `For/For Each`, `Do/Loop`, `While/Wend`, `Select Case`, `With`, `Class` with
 properties, `On Error Resume Next`, `Err`, arrays, the usual string/math/conversion functions, `RGB()` and the `vb*`
-constants. Table objects (`Table1`, timers, `PlaySound`...) do not exist here beyond a `Table1.Filename` stub, so
-keep the DMD code self-contained or stub them with your own Subs.
+constants, and `Eval`/`GetRef` so a framework can dispatch a Sub by name. Table objects (`Table1`, lights, timers,
+`PlaySound`) are stood in for: reading one gives an empty value and calling one does nothing, which is what lets a
+whole table script run here.
 
 ## Fidelity
 

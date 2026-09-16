@@ -20,6 +20,20 @@ select, input[type=text], input[type=number] { background: var(--bg3); color: va
 .status { color: var(--fg2); font-variant-numeric: tabular-nums; white-space: nowrap; }
 .status.error { color: var(--err); }
 .status.ok { color: var(--ok); }
+#runbar { display: flex; align-items: center; gap: 10px; padding: 4px 10px; background: var(--bg2); border-bottom: 1px solid var(--border); flex-wrap: wrap; font-size: 12px; }
+#runbar label { display: inline-flex; align-items: center; gap: 5px; color: var(--fg2); }
+#runbar input[type=text] { background: var(--bg3); color: var(--fg); border: 1px solid var(--border); border-radius: 4px; padding: 2px 6px; font: inherit; font-family: 'SF Mono', Menlo, Consolas, monospace; width: 180px; }
+#runbar .spacer { flex: 1; }
+#file-label { font-family: 'SF Mono', Menlo, Consolas, monospace; }
+.file-row { display: flex; align-items: center; gap: 6px; padding: 3px 4px; border-radius: 4px; }
+.file-row:hover { background: var(--bg3); }
+.file-row.active { background: rgba(59, 130, 246, 0.25); }
+.file-row .name { flex: 1; font-family: 'SF Mono', Menlo, Consolas, monospace; cursor: pointer; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.file-row .lines { color: var(--fg2); font-size: 11px; }
+.file-row button { padding: 0 5px; line-height: 1.4; }
+#stub-badge { background: var(--warn); color: #111; border-radius: 8px; padding: 0 5px; font-size: 11px; margin-left: 3px; }
+.stub-row { display: flex; gap: 8px; font-family: 'SF Mono', Menlo, Consolas, monospace; font-size: 12px; padding: 1px 0; }
+.stub-row .count { color: var(--fg2); min-width: 3em; text-align: right; }
 #main { display: flex; flex: 1; min-height: 0; }
 #editor-pane { width: 50%; min-width: 240px; display: flex; flex-direction: column; min-height: 0; }
 #editor { flex: 1; min-height: 0; overflow: hidden; }
