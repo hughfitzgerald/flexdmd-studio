@@ -280,7 +280,19 @@ export class AssetManager {
 
   getGif(src: AssetSrc): GifData {
     if (src.assetType !== 'gif') throw new AssetLoadError(`'${src.path}' is not a GIF`);
-    return this.ensureRaw(src, src.path, 'gif').gif!;
+    try {
+      return this.ensureRaw(src, src.path, 'gif').gif!;
+    } catch (e) {
+      if (e instanceof AssetPendingError || !this.substituteMissing) throw e;
+      this.warnMissing(src.path, 'animation');
+      return AssetManager.placeholderGif();
+    }
+  }
+
+  /** A single still frame, used when an animation or video file is not there. */
+  static placeholderGif(): GifData {
+    const frame = placeholderBitmap();
+    return { width: frame.width, height: frame.height, frames: [frame], delays: [1] };
   }
 
   getVideo(src: AssetSrc): HTMLVideoElement {

@@ -2,7 +2,7 @@
 // licensed under the Apache License 2.0. TypeScript translation of FlexDMD/FlexDMD.cs, modified
 // from the original. See the NOTICE file at the repository root.
 import { VbArray } from '../vbs/values';
-import { AssetManager, AssetPendingError } from './assets';
+import { AssetManager, AssetLoadError, AssetPendingError } from './assets';
 import { Frame, Group } from './actor';
 import { Image } from './image';
 import { Label } from './label';
@@ -98,7 +98,17 @@ export class FlexDMD {
     try {
       if (path.includes('|')) return new ImageSequence(this.AssetManager, path, String(name));
       const src = this.AssetManager.resolveSrc(path);
-      if (src.assetType === 'video') return new VideoActor(this.AssetManager, path, String(name));
+      if (src.assetType === 'video') {
+        try {
+          return new VideoActor(this.AssetManager, path, String(name));
+        } catch (e) {
+          if (e instanceof AssetPendingError || !this.AssetManager.substituteMissing) throw e;
+          // Scripts do "group.AddActor FlexDMD.NewVideo(...)" without checking, so returning
+          // Nothing for a file that is simply not here would stop the whole scene being built.
+          this.onLog('warn', `Missing video '${src.path}': using a placeholder.`);
+          return new GIFImage(this.AssetManager, path, String(name), AssetManager.placeholderGif());
+        }
+      }
       if (src.assetType === 'gif') return new GIFImage(this.AssetManager, path, String(name));
       if (src.assetType === 'image') return new ImageSequence(this.AssetManager, path, String(name));
       this.onLog('error', `NewVideo('${name}', '${path}'): unsupported video type, returning Nothing`);

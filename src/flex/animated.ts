@@ -107,9 +107,9 @@ export class GIFImage extends AnimatedActor {
   private _pos = 0;
   private _length = 0;
 
-  constructor(manager: AssetManager, path: string, name = '') {
+  constructor(manager: AssetManager, path: string, name = '', gif?: GifData) {
     super(name);
-    this._gif = manager.getGif(manager.resolveSrc(path));
+    this._gif = gif ?? manager.getGif(manager.resolveSrc(path));
     for (const d of this._gif.delays) this._length += d;
     this.rewind();
     this.Pack();

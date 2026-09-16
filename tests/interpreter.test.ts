@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { GhostRegistry, Interpreter, VbArray } from '../src/vbs/interpreter';
+import { VbDictionary } from '../src/vbs/dictionary';
 
 function run(src: string, globals: Record<string, object> = {}) {
   const logs: string[] = [];
@@ -201,6 +202,50 @@ describe('VBScript interpreter', () => {
     expect(interp.getGlobal('ok')).toBe('guard ran'); // "Is Nothing" guards still take the real branch
     expect(interp.getGlobal('c')).toBe(-1);           // an unknown array is empty, so loops over it do not run
     expect(ghosts.list().map((g) => g.path)).toContain('playsound()'); // () marks a name used as a call
+  });
+
+  it('accepts a statement closed by a block keyword with no separator', () => {
+    // Real framework code writes properties this way: "State = m_state End Property"
+    const { it } = run(`
+      Class Thing
+        Private m_state
+        Public Property Get State(): State = m_state End Property
+        Public Property Let State(v): m_state = v End Property
+        Public Sub Bump(): m_state = m_state + 1 End Sub
+      End Class
+      Dim t : Set t = New Thing
+      t.State = 5
+      t.Bump
+      r = t.State
+    `);
+    expect(it.getGlobal('r')).toBe(6);
+  });
+
+  it('provides a working Scripting.Dictionary', () => {
+    const logs: string[] = [];
+    const interp = new Interpreter({
+      createObject: (id) => (id.toLowerCase() === 'scripting.dictionary' ? new VbDictionary() : undefined),
+      log: (m) => logs.push(m),
+    });
+    interp.run(`
+      Dim d : Set d = CreateObject("Scripting.Dictionary")
+      d.Add "a", 1
+      d.Add "b", 2
+      d("c") = 3
+      d.Item("b") = 20
+      Dim n, k
+      For Each k In d.Keys
+        n = n & k & "=" & d(k) & ";"
+      Next
+      Dim count : count = d.Count
+      Dim has : has = d.Exists("a")
+      d.Remove "a"
+      Dim after : after = d.Count
+    `);
+    expect(interp.getGlobal('n')).toBe('a=1;b=20;c=3;');
+    expect(interp.getGlobal('count')).toBe(3);
+    expect(interp.getGlobal('has')).toBe(true);
+    expect(interp.getGlobal('after')).toBe(2);
   });
 
   it('aborts runaway loops', () => {

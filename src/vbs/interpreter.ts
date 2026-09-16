@@ -3,6 +3,7 @@ import { parse, VbsSyntaxError } from './parser';
 import { hostCallContext } from './hostcontext';
 import { createBuiltins, type Builtin } from './builtins';
 import { Ghost, GhostRegistry } from './ghost';
+import { VbDictionary } from './dictionary';
 import { formatNumber, isObjectValue, isNumericString, roundHalfEven, toBool, toNumber, toStr, typeName, VbArray, VbNull, VbNullType, VbsRuntimeError, type VbValue } from './values';
 
 export { VbsRuntimeError, VbsSyntaxError };
@@ -362,10 +363,17 @@ export class Interpreter {
           const cur = s?.vars.get(target.callee.name);
           if (cur instanceof VbArray) { cur.set(args.map((a) => toInt(a)), value); return; }
           if (cur instanceof ClassInstance) { this.classSet(cur, 'default', args, value, scope); return; }
+          const setter = (cur as { vbSetIndexed?: (n: string, a: VbValue[], v: VbValue) => boolean } | undefined)?.vbSetIndexed;
+          if (typeof setter === 'function' && setter.call(cur, '', args, value)) return;
           throw new VbsRuntimeError(`Cannot assign to '${target.callee.name}(...)': it is not an array`, target.span, 13);
         }
         if (target.callee.kind === 'member') {
           const obj = target.callee.object.kind === 'with' ? this.currentWith(target.span) : this.evalExpr(target.callee.object, scope);
+          // Reading the member to find out whether it is an array would call it when it is a
+          // method, and that can have side effects (Dictionary.Item adds a missing key), so ask
+          // objects that handle indexed assignment themselves before probing.
+          const setter = (obj as { vbSetIndexed?: unknown } | null)?.vbSetIndexed;
+          if (typeof setter === 'function') { this.setMember(obj, target.callee.name, args, value, scope, target.span, valueExpr); return; }
           const cur = this.getMember(obj, target.callee.name, [], scope, target.span);
           if (cur instanceof VbArray) { cur.set(args.map((a) => toInt(a)), value); return; }
           this.setMember(obj, target.callee.name, args, value, scope, target.span, valueExpr);
@@ -578,6 +586,7 @@ export class Interpreter {
     const base = this.evalExpr(callee, scope);
     if (base instanceof VbArray) return base.get(args.map((a) => toInt(a)));
     if (base instanceof ProcRef) return this.invokeProc(base.decl, args, base.self, e.args);
+    if (base instanceof ClassInstance) return this.classGet(base, 'default', args, scope, e.span, e.args);
     if (base && typeof base === 'object') return this.hostIndex(base, args, e.span);
     if (typeof base === 'string') return this.callValue(base, args);
     throw new VbsRuntimeError('Value cannot be called or indexed', e.span, 13);
@@ -654,7 +663,11 @@ export class Interpreter {
     if (obj instanceof VbArray || typeof obj !== 'object') throw new VbsRuntimeError(`Object required: '${typeName(obj)}' has no member '${name}'`, span, 424);
     const key = this.hostKey(obj, name);
     if (key === undefined) throw new VbsRuntimeError(`Object doesn't support this property or method: '${name}'`, span, 438);
-    if (args.length > 0) throw new VbsRuntimeError(`Indexed property assignment is not supported for '${name}'`, span, 438);
+    if (args.length > 0) {
+      const setter = (obj as { vbSetIndexed?: (n: string, a: VbValue[], v: VbValue) => boolean }).vbSetIndexed;
+      if (typeof setter === 'function' && setter.call(obj, name, args, value)) return;
+      throw new VbsRuntimeError(`Indexed property assignment is not supported for '${name}'`, span, 438);
+    }
     this.fillHostContext([valueExpr], scope);
     try {
       (obj as Record<string, unknown>)[key] = value;

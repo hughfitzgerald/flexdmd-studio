@@ -3,6 +3,9 @@ import { tokenize, VbsSyntaxError, type Token } from './lexer';
 
 export { VbsSyntaxError };
 
+/** Keywords that close a block, and so can follow a statement without a separator. */
+const BLOCK_ENDERS = new Set(['end', 'next', 'loop', 'wend', 'else', 'elseif', 'case']);
+
 export function parse(src: string): Program {
   return new Parser(tokenize(src)).parseProgram();
 }
@@ -41,9 +44,16 @@ class Parser {
   private skipEols() { while (this.is('eol')) this.next(); }
   private endStatement() {
     if (this.is('eof')) return;
-    if (!this.is('eol')) this.error(`Unexpected ${this.describe(this.peek())}`);
-    // consume one statement terminator (extra blank lines are skipped by the block parser)
-    this.next();
+    if (this.is('eol')) {
+      // consume one statement terminator (extra blank lines are skipped by the block parser)
+      this.next();
+      return;
+    }
+    // VBScript lets a keyword that closes a block end the statement before it with no separator,
+    // as in "Public Property Get State(): State = m_state End Property". Leave it for the block
+    // parser to consume.
+    if (this.peek().type === 'kw' && BLOCK_ENDERS.has(this.peek().value)) return;
+    this.error(`Unexpected ${this.describe(this.peek())}`);
   }
   private spanFrom(start: Span): Span { return { start: start.start, end: this.tokens[this.pos - 1].span.end, line: start.line }; }
   private identName(): string {

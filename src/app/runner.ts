@@ -3,6 +3,7 @@ import { Interpreter, VbsRuntimeError, VbsSyntaxError, VbArray, GhostRegistry, t
 import type { Span } from '../vbs/ast';
 import { FlexDMD, type LogLevel } from '../flex/flexdmd';
 import { constantGlobals } from '../flex/constants';
+import { VbDictionary } from '../vbs/dictionary';
 import { AssetPendingError } from '../flex/assets';
 import type { ProcDecl } from '../vbs/ast';
 
@@ -163,6 +164,8 @@ export class Runner {
             : undefined,
           createObject: (progId) => {
             if (progId.toLowerCase() === 'flexdmd.flexdmd') return flex;
+            // Frameworks keep their event tables and player state in dictionaries, so this one is real
+            if (progId.toLowerCase() === 'scripting.dictionary') return new VbDictionary();
             if (this.ghosts.enabled) return this.ghosts.touch(`CreateObject("${progId}")`);
             throw new VbsRuntimeError(`CreateObject("${progId}") is not available in the previewer`, null, 429);
           },
