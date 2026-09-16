@@ -271,4 +271,16 @@ describe('VBScript interpreter', () => {
   it('aborts runaway loops', () => {
     expect(() => run('Do\nLoop')).toThrow(/execution budget/);
   });
+
+  it('reports how many parameters a Sub declares, for the Builder-shape check', () => {
+    const { it } = run(`
+      Sub NoArgs() : End Sub
+      Sub OneArg(entry) : End Sub
+      Sub TwoArgs(a, b) : End Sub
+    `);
+    expect(it.procParams('NoArgs')).toBe(0);
+    expect(it.procParams('OneArg')).toBe(1);
+    expect(it.procParams('TwoArgs')).toBe(2);
+    expect(it.procParams('DoesNotExist')).toBe(-1);
+  });
 });

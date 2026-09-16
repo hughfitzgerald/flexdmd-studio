@@ -1,6 +1,100 @@
-export interface Sample { name: string; source: string; }
+export interface Sample {
+  name: string;
+  source: string;
+  /** Pre-fills the run bar's "On run" field when this sample is loaded */
+  onRun?: string;
+  /** Pre-fills the run bar's "Each frame" field when this sample is loaded */
+  perFrame?: string;
+}
 
 export const SAMPLES: Sample[] = [
+  {
+    name: 'Builder + Ticker: live score demo',
+    onRun: 'BuildScoreDemo',
+    perFrame: 'TickScoreDemo',
+    source: `' ================================================================
+'  Builder + Ticker: a scene built once, then fed data every frame -
+'  the shape most real FlexDMD scenes actually take.
+' ================================================================
+'
+' A BUILDER runs once: it creates the fonts and actors, lays them out,
+' and hands the finished scene to whoever asked for it. A TICKER runs
+' every frame after that and pushes fresh values into the actors the
+' Builder already made - score, timers, anything computed from game
+' state. Neither Sub is called from anywhere in this file, on purpose:
+' a framework (or a table's own DMD timer) is what would normally call
+' them, and FlexDMD Studio's run bar stands in for that.
+'
+' This sample loaded with "On run" set to BuildScoreDemo and "Each
+' frame" set to TickScoreDemo. Try clearing either field (top of the
+' window) to see what breaks: with no "On run" the scene is built but
+' never shown; with no "Each frame" it shows once and then sits still.
+' You can also click either Sub in the Subs tab - the studio hands
+' BuildScoreDemo the same stand-in entry either way.
+
+Dim fontBig, fontSmall, startFrame   ' shared between the two Subs, so declared up here
+
+Sub BuildScoreDemo(entry)
+    ' Fonts are created once, here - not in the Ticker, where each
+    ' NewFont call would re-tint its texture 60 times a second for no
+    ' reason.
+    Set fontBig = FlexDMD.NewFont("FlexDMD.Resources.udmd-f7by13.fnt", vbWhite, vbWhite, 0)
+    Set fontSmall = FlexDMD.NewFont("FlexDMD.Resources.udmd-f5by7.fnt", vbWhite, vbWhite, 0)
+
+    Dim scene : Set scene = FlexDMD.NewGroup("ScoreDemo")
+    scene.SetSize FlexDMD.Width, FlexDMD.Height
+    scene.ClearBackground = True
+
+    ' A fixed box for the score, with AutoPack off: the Ticker only
+    ' ever changes .Text below, never the layout, so a longer number
+    ' cannot resize the label out from under itself.
+    Dim score : Set score = FlexDMD.NewLabel("Score", fontBig, "0")
+    score.AutoPack = False
+    score.SetBounds 0, 2, 128, 14
+    scene.AddActor score
+
+    Dim status : Set status = FlexDMD.NewLabel("Status", fontSmall, "BALL 1")
+    status.AutoPack = False
+    status.SetBounds 0, 23, 128, 8
+    scene.AddActor status
+
+    ' An indicator the Ticker blinks by hand, driven straight off
+    ' FlexFrame - never a counted ActionFactory.Blink here, since it
+    ' would stop working the second time this scene is shown (see the
+    ' flexdmd-scenes skill's pitfalls on Blink).
+    Dim dot : Set dot = FlexDMD.NewFrame("Dot")
+    dot.SetBounds 60, 17, 8, 4
+    dot.Fill = True
+    dot.FillColor = RGB(255, 160, 0)
+    dot.Thickness = 0
+    scene.AddActor dot
+
+    startFrame = FlexFrame
+
+    ' Framework style: hand the scene back rather than showing it
+    ' directly. FlexDMD Studio passes a stand-in "entry" here whose
+    ' SetScene puts the scene on the display.
+    entry.SetScene scene
+End Sub
+
+Sub TickScoreDemo()
+    Dim elapsed : elapsed = FlexFrame - startFrame
+
+    ' Stand-in "game state": a score that counts up and a ball number
+    ' that advances every five seconds. Replace this with real reads
+    ' from your table or framework.
+    Dim score : score = elapsed * 1370
+    Dim ball : ball = 1 + ((elapsed \\ 300) Mod 3)
+
+    FlexDMD.Stage.GetLabel("Score").Text = FormatNumber(score, 0)
+    FlexDMD.Stage.GetLabel("Status").Text = "BALL " & ball
+
+    ' 2 Hz blink, computed directly from the frame count rather than
+    ' with an action - fine for something this simple.
+    FlexDMD.Stage.GetFrame("Dot").Visible = ((elapsed \\ 15) Mod 2) = 0
+End Sub
+`,
+  },
   {
     name: 'Two scenes (FlexDMDUI default)',
     source: `' The classic FlexDMDUI sample: two scenes alternating every 5 seconds.

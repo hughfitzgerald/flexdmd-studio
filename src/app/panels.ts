@@ -97,8 +97,10 @@ so you can write the DMD part of a table script on any OS and watch it run. Scri
 
 <h3>Three ways to use it</h3>
 <ul>
+<li><b>A Builder and a Ticker.</b> The default sample (this studio's own landing page) is a pair of Subs, built once and fed live values
+every frame — the shape most non-trivial FlexDMD scenes actually take, and exactly what <b>On run</b> / <b>Each frame</b> below are for.</li>
 <li><b>A scene on its own.</b> A <code>FlexDMD</code> object is pre-created with <code>Run = True</code>, so you can write scene code straight
-away, like the FlexDMDUI design tab. Start from the Samples menu.</li>
+away, like the FlexDMDUI design tab. The rest of the Samples menu has plain single-block scenes.</li>
 <li><b>A whole table script.</b> Paste or open one. Everything it reaches for that this is not — the table, lights, timers, sound, the
 framework — is stood in for, and any line of setup that still fails is skipped and listed. Set <b>On run</b> to the table's init Sub
 (often <code>Table1_Init</code>) to build its DMD.</li>

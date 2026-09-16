@@ -20,14 +20,26 @@ const SETTINGS_KEY = 'flexdmd-studio.settings';
 const AUTORUN_LINE_LIMIT = 4000;
 
 interface Settings { onRun: string; perFrame: string; stub: boolean; autoRun: boolean; }
-const settings: Settings = { onRun: '', perFrame: '', stub: true, autoRun: true, ...readSettings() };
 function readSettings(): Partial<Settings> {
   try { return JSON.parse(localStorage.getItem(SETTINGS_KEY) ?? '{}'); } catch { return {}; }
 }
 function saveSettings() { try { localStorage.setItem(SETTINGS_KEY, JSON.stringify(settings)); } catch { /* private window */ } }
 
+// Someone who has never used the studio in this browser gets the flagship sample as a landing
+// page, run bar fields and all, so the first thing they see is it animating. Anyone with a saved
+// script or settings keeps exactly what they had; readSettings() spread last wins per key.
+const isFreshUser = localStorage.getItem(STORAGE_KEY) === null;
+const DEFAULT_SAMPLE = SAMPLES[0];
+const settings: Settings = {
+  onRun: isFreshUser ? (DEFAULT_SAMPLE.onRun ?? '') : '',
+  perFrame: isFreshUser ? (DEFAULT_SAMPLE.perFrame ?? '') : '',
+  stub: true,
+  autoRun: true,
+  ...readSettings(),
+};
+
 // ---- project ----
-const project = new Project(localStorage.getItem(STORAGE_KEY) ?? SAMPLES[1].source);
+const project = new Project(localStorage.getItem(STORAGE_KEY) ?? DEFAULT_SAMPLE.source);
 let sourceMap: SourceMapEntry[] = [];
 
 // ---- panels ----
@@ -334,15 +346,17 @@ const onRunInput = $<HTMLInputElement>('#in-onrun');
 const perFrameInput = $<HTMLInputElement>('#in-perframe');
 onRunInput.value = settings.onRun;
 perFrameInput.value = settings.perFrame;
-const applyEntryPoints = () => {
-  settings.onRun = onRunInput.value;
-  settings.perFrame = perFrameInput.value;
-  runner.entryPoints = { onRun: settings.onRun, perFrame: settings.perFrame };
+/** Sets both entry-point fields (and the input boxes showing them) at once. */
+function setEntryPoints(onRun: string, perFrame: string) {
+  onRunInput.value = onRun;
+  perFrameInput.value = perFrame;
+  settings.onRun = onRun;
+  settings.perFrame = perFrame;
+  runner.entryPoints = { onRun, perFrame };
   saveSettings();
-  void runNow();
-};
-onRunInput.addEventListener('change', applyEntryPoints);
-perFrameInput.addEventListener('change', applyEntryPoints);
+}
+onRunInput.addEventListener('change', () => { setEntryPoints(onRunInput.value, perFrameInput.value); void runNow(); });
+perFrameInput.addEventListener('change', () => { setEntryPoints(onRunInput.value, perFrameInput.value); void runNow(); });
 
 const stubBox = $<HTMLInputElement>('#chk-stub');
 stubBox.checked = settings.stub;
@@ -366,6 +380,9 @@ sampleSel.addEventListener('change', () => {
   if (!s) return;
   if (editor.text.trim() && !confirm(`Replace ${project.activePath} with the sample?`)) { sampleSel.value = ''; return; }
   editor.setText(s.source);
+  // A sample fully determines the run bar: samples that need no entry points (most of them, which
+  // call their own Subs directly) clear whatever was set for the last one.
+  setEntryPoints(s.onRun ?? '', s.perFrame ?? '');
   sampleSel.value = '';
   void runNow();
 });

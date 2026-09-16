@@ -253,6 +253,11 @@ export class Runner {
       if (argsText.trim()) {
         const arr = this.interp.evalExpression(`Array(${argsText})`);
         args = arr instanceof VbArray ? arr.toList() : [arr];
+      } else if (this.interp.procParams(name) === 1) {
+        // A one-argument Sub called with nothing typed is the Builder shape: a framework would
+        // have passed its own entry object. Give it the studio's, the same one the run bar's
+        // entry-point fields use, so clicking it in the Subs tab works the same way.
+        args = [this.sceneEntry];
       }
       const t0 = performance.now();
       this.interp.callProc(name, args);

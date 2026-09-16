@@ -35,8 +35,12 @@ until you have done that.
 
 ### Three ways in
 
+- **A Builder and a Ticker.** The default sample (and the studio's own landing page) is a pair of Subs, built once
+  and fed live values every frame — the shape most non-trivial FlexDMD scenes actually take, and exactly what the
+  run bar's **On run** / **Each frame** fields are for. Read it before writing your own; it is the fastest way to
+  see the pattern working.
 - **A scene on its own.** A `FlexDMD` object is pre-created with `Run = True`, exactly like the FlexDMDUI design
-  tab, so you can write scene code straight away. Start from the Samples menu.
+  tab, so you can write scene code straight away. The rest of the Samples menu has plain single-block scenes.
 - **A whole table script.** Paste or open one, however large. Everything it reaches for that the previewer is not
   — the table, lights, timers, sound, the framework it is built on — is stood in for, and any line of setup that
   still fails is skipped and listed rather than stopping the run. Set **On run** to the table's init Sub (often
